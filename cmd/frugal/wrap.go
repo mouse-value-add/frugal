@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"net"
@@ -77,7 +78,11 @@ func runWrap(configPath string, args []string) int {
 	}()
 
 	// Wait for proxy to be ready
-	waitForReady(fmt.Sprintf("http://127.0.0.1:%d/health", port))
+	if err := waitForReady(fmt.Sprintf("http://127.0.0.1:%d/health", port), 5*time.Second); err != nil {
+		_ = server.Close()
+		fmt.Fprintf(os.Stderr, "frugal: proxy failed to become ready: %v\n", err)
+		return 1
+	}
 
 	fmt.Fprintf(os.Stderr, "frugal: proxy running on :%d → routing across %d models\n", port, len(registry.AllModels()))
 
@@ -144,13 +149,30 @@ func injectEnv(environ []string, baseURL string) []string {
 	return out
 }
 
-func waitForReady(url string) {
-	for i := 0; i < 50; i++ {
-		resp, err := http.Get(url)
+func waitForReady(url string, timeout time.Duration) error {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	ticker := time.NewTicker(25 * time.Millisecond)
+	defer ticker.Stop()
+
+	for {
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+		if err != nil {
+			return err
+		}
+		resp, err := http.DefaultClient.Do(req)
 		if err == nil {
 			resp.Body.Close()
-			return
+			if resp.StatusCode >= 200 && resp.StatusCode < 300 {
+				return nil
+			}
 		}
-		time.Sleep(10 * time.Millisecond)
+
+		select {
+		case <-ctx.Done():
+			return fmt.Errorf("timed out after %s waiting for %s", timeout, url)
+		case <-ticker.C:
+		}
 	}
 }
