@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -75,5 +76,79 @@ func TestLoad_MissingFile(t *testing.T) {
 	_, err := Load("/nonexistent/path/config.yaml")
 	if err == nil {
 		t.Error("expected error for missing file")
+	}
+}
+
+func TestLoad_InvalidConfig_MissingBalancedThreshold(t *testing.T) {
+	content := `
+providers:
+  openai:
+    api_key_env: OPENAI_API_KEY
+    models:
+      gpt-4o-mini:
+        cost_per_1k_input: 0.00015
+        cost_per_1k_output: 0.0006
+        capabilities:
+          reasoning: 0.7
+          coding: 0.7
+          creative: 0.7
+          instruction_following: 0.7
+          max_context: 128000
+quality_thresholds:
+  high:
+    min_reasoning: 0.9
+    min_coding: 0.9
+    min_creative: 0.9
+    min_instruction_following: 0.9
+`
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.yaml")
+	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	_, err := Load(path)
+	if err == nil {
+		t.Fatal("expected validation error")
+	}
+	if got := err.Error(); got == "" || !strings.Contains(got, "quality_thresholds.balanced") {
+		t.Fatalf("expected balanced threshold validation error, got: %v", err)
+	}
+}
+
+func TestLoad_InvalidConfig_NegativeCost(t *testing.T) {
+	content := `
+providers:
+  openai:
+    api_key_env: OPENAI_API_KEY
+    models:
+      gpt-4o-mini:
+        cost_per_1k_input: -0.00015
+        cost_per_1k_output: 0.0006
+        capabilities:
+          reasoning: 0.7
+          coding: 0.7
+          creative: 0.7
+          instruction_following: 0.7
+          max_context: 128000
+quality_thresholds:
+  balanced:
+    min_reasoning: 0.7
+    min_coding: 0.7
+    min_creative: 0.7
+    min_instruction_following: 0.7
+`
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.yaml")
+	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	_, err := Load(path)
+	if err == nil {
+		t.Fatal("expected validation error")
+	}
+	if got := err.Error(); got == "" || !strings.Contains(got, "costs must be non-negative") {
+		t.Fatalf("expected non-negative cost validation error, got: %v", err)
 	}
 }
