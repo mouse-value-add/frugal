@@ -80,6 +80,10 @@ func main() {
 	// Build classifier and router
 	cls := classifier.NewRuleBased()
 	modelEntries, thresholds := router.BuildTaxonomy(cfg)
+	modelEntries = filterRegisteredModels(modelEntries, registry)
+	if len(modelEntries) == 0 {
+		log.Fatal("no routable models available for registered providers")
+	}
 	rtr := router.New(modelEntries, thresholds)
 
 	// Build HTTP handler
@@ -116,4 +120,14 @@ func modelNames(pc config.ProviderConfig) []string {
 		names = append(names, name)
 	}
 	return names
+}
+
+func filterRegisteredModels(entries []router.ModelEntry, registry *provider.Registry) []router.ModelEntry {
+	filtered := make([]router.ModelEntry, 0, len(entries))
+	for _, entry := range entries {
+		if _, err := registry.Resolve(entry.Name); err == nil {
+			filtered = append(filtered, entry)
+		}
+	}
+	return filtered
 }

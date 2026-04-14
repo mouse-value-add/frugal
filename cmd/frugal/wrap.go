@@ -47,6 +47,11 @@ func runWrap(configPath string, args []string) int {
 
 	cls := classifier.NewRuleBased()
 	modelEntries, thresholds := router.BuildTaxonomy(cfg)
+	modelEntries = filterRegisteredModels(modelEntries, registry)
+	if len(modelEntries) == 0 {
+		fmt.Fprintln(os.Stderr, "frugal: no routable models available for registered providers")
+		return 1
+	}
 	rtr := router.New(modelEntries, thresholds)
 	h := proxy.NewHandler(cls, rtr, registry)
 
