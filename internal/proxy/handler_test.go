@@ -205,6 +205,54 @@ func TestChatCompletions_Streaming(t *testing.T) {
 	}
 }
 
+func TestChatCompletions_RejectsNonJSONContentType(t *testing.T) {
+	_, ts := setupHandler()
+	defer ts.Close()
+
+	body, _ := json.Marshal(types.ChatCompletionRequest{
+		Model:    "auto",
+		Messages: []types.Message{{Role: "user", Content: mustMarshalJSON("Hello")}},
+	})
+
+	req, _ := http.NewRequest("POST", ts.URL+"/v1/chat/completions", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "text/plain")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusUnsupportedMediaType {
+		b, _ := io.ReadAll(resp.Body)
+		t.Fatalf("expected 415, got %d: %s", resp.StatusCode, string(b))
+	}
+}
+
+func TestChatCompletions_AcceptsJSONContentTypeWithCharset(t *testing.T) {
+	_, ts := setupHandler()
+	defer ts.Close()
+
+	body, _ := json.Marshal(types.ChatCompletionRequest{
+		Model:    "auto",
+		Messages: []types.Message{{Role: "user", Content: mustMarshalJSON("Hello")}},
+	})
+
+	req, _ := http.NewRequest("POST", ts.URL+"/v1/chat/completions", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json; charset=utf-8")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		b, _ := io.ReadAll(resp.Body)
+		t.Fatalf("expected 200, got %d: %s", resp.StatusCode, string(b))
+	}
+}
+
 func TestChatCompletions_ModelPinning(t *testing.T) {
 	_, ts := setupHandler()
 	defer ts.Close()

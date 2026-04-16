@@ -146,7 +146,7 @@ Add models by editing `~/.frugal/config/models.yaml`.
 
 ## API
 
-When running as a server, Frugal exposes an OpenAI-compatible API:
+When running as a server, Frugal exposes an OpenAI-compatible API. For chat requests, send `Content-Type: application/json` (charset parameters are supported).
 
 | Endpoint | Description |
 |----------|-------------|
