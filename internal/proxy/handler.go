@@ -21,10 +21,10 @@ type Handler struct {
 	registry   *provider.Registry
 
 	// Ring buffer of recent routing decisions for /v1/routing/explain
-	mu             sync.Mutex
-	decisions      []types.RoutingDecision
-	decisionIdx    int
-	lastDecision   *types.RoutingDecision
+	mu           sync.Mutex
+	decisions    []types.RoutingDecision
+	decisionIdx  int
+	lastDecision *types.RoutingDecision
 }
 
 func NewHandler(cls classifier.Classifier, rtr *router.Router, reg *provider.Registry) *Handler {
@@ -114,6 +114,11 @@ func (h *Handler) handleNonStream(w http.ResponseWriter, r *http.Request, prov p
 			}
 			resp, err = fbProv.ChatCompletion(r.Context(), fb, req)
 			if err == nil {
+				decision.SelectedModel = fb
+				decision.SelectedProvider = fbProv.Name()
+				w.Header().Set("X-Frugal-Model", decision.SelectedModel)
+				w.Header().Set("X-Frugal-Provider", decision.SelectedProvider)
+				h.recordDecision(decision)
 				break
 			}
 			log.Printf("fallback %s failed: %v", fb, err)
@@ -139,6 +144,11 @@ func (h *Handler) handleStream(w http.ResponseWriter, r *http.Request, prov prov
 			}
 			ch, err = fbProv.ChatCompletionStream(r.Context(), fb, req)
 			if err == nil {
+				decision.SelectedModel = fb
+				decision.SelectedProvider = fbProv.Name()
+				w.Header().Set("X-Frugal-Model", decision.SelectedModel)
+				w.Header().Set("X-Frugal-Provider", decision.SelectedProvider)
+				h.recordDecision(decision)
 				break
 			}
 			log.Printf("fallback stream %s failed: %v", fb, err)

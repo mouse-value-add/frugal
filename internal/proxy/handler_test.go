@@ -19,16 +19,21 @@ import (
 
 // mockProvider implements provider.Provider for testing.
 type mockProvider struct {
-	name      string
-	models    []string
-	response  *types.ChatCompletionResponse
-	streamErr error
+	name             string
+	models           []string
+	response         *types.ChatCompletionResponse
+	streamErr        error
+	failModels       map[string]bool
+	failStreamModels map[string]bool
 }
 
-func (m *mockProvider) Name() string    { return m.name }
+func (m *mockProvider) Name() string     { return m.name }
 func (m *mockProvider) Models() []string { return m.models }
 
 func (m *mockProvider) ChatCompletion(ctx context.Context, model string, req *types.ChatCompletionRequest) (*types.ChatCompletionResponse, error) {
+	if m.failModels != nil && m.failModels[model] {
+		return nil, context.DeadlineExceeded
+	}
 	if m.response != nil {
 		return m.response, nil
 	}
@@ -51,6 +56,9 @@ func (m *mockProvider) ChatCompletion(ctx context.Context, model string, req *ty
 }
 
 func (m *mockProvider) ChatCompletionStream(ctx context.Context, model string, req *types.ChatCompletionRequest) (<-chan provider.StreamChunk, error) {
+	if m.failStreamModels != nil && m.failStreamModels[model] {
+		return nil, context.DeadlineExceeded
+	}
 	if m.streamErr != nil {
 		return nil, m.streamErr
 	}
@@ -326,6 +334,130 @@ func TestRoutingExplain_AfterRequest(t *testing.T) {
 	if decision.SelectedModel == "" {
 		t.Error("expected selected model in routing decision")
 	}
+}
+
+func TestChatCompletions_NonStreaming_FallbackUpdatesHeaders(t *testing.T) {
+	body, _ := json.Marshal(types.ChatCompletionRequest{
+		Model:    "auto",
+		Messages: []types.Message{{Role: "user", Content: mustMarshalJSON("Hello")}},
+	})
+
+	// Replace registry provider behavior: selected model fails, fallback succeeds.
+	// setupHandler always registers a *mockProvider as "mock".
+	// We create a fresh handler to control provider behavior for this test.
+	reg := provider2RegistryForFallback(false)
+	cls := classifier.NewRuleBased()
+	rtr := router.New([]router.ModelEntry{
+		{
+			Name: "mock-cheap", Provider: "mock",
+			CostPer1KInput: 0.0001, CostPer1KOutput: 0.0004,
+			Reasoning: 0.70, Coding: 0.68, Creative: 0.65, InstructFollowing: 0.72,
+			ToolUse: true, JSONMode: true, MaxContext: 128000,
+		},
+		{
+			Name: "mock-premium", Provider: "mock",
+			CostPer1KInput: 0.003, CostPer1KOutput: 0.015,
+			Reasoning: 0.95, Coding: 0.93, Creative: 0.90, InstructFollowing: 0.95,
+			ToolUse: true, JSONMode: true, MaxContext: 200000,
+		},
+	}, map[string]router.Threshold{
+		"high":     {MinReasoning: 0.88, MinCoding: 0.85, MinCreative: 0.82, MinInstructFollowing: 0.88},
+		"balanced": {MinReasoning: 0.70, MinCoding: 0.68, MinCreative: 0.65, MinInstructFollowing: 0.72},
+		"cost":     {},
+	})
+	handler := NewHandler(cls, rtr, reg)
+	mux := http.NewServeMux()
+	mux.HandleFunc("POST /v1/chat/completions", handler.ChatCompletions)
+	tsrv := httptest.NewServer(HeaderExtractionMiddleware(mux))
+	defer tsrv.Close()
+
+	req, _ := http.NewRequest("POST", tsrv.URL+"/v1/chat/completions", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-Frugal-Fallback", "mock-premium")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		b, _ := io.ReadAll(resp.Body)
+		t.Fatalf("expected 200, got %d: %s", resp.StatusCode, string(b))
+	}
+
+	if got := resp.Header.Get("X-Frugal-Model"); got != "mock-premium" {
+		t.Fatalf("expected fallback header model mock-premium, got %q", got)
+	}
+}
+
+func TestChatCompletions_Streaming_FallbackUpdatesHeaders(t *testing.T) {
+	reg := provider2RegistryForFallback(true)
+	cls := classifier.NewRuleBased()
+	rtr := router.New([]router.ModelEntry{
+		{
+			Name: "mock-cheap", Provider: "mock",
+			CostPer1KInput: 0.0001, CostPer1KOutput: 0.0004,
+			Reasoning: 0.70, Coding: 0.68, Creative: 0.65, InstructFollowing: 0.72,
+			ToolUse: true, JSONMode: true, MaxContext: 128000,
+		},
+		{
+			Name: "mock-premium", Provider: "mock",
+			CostPer1KInput: 0.003, CostPer1KOutput: 0.015,
+			Reasoning: 0.95, Coding: 0.93, Creative: 0.90, InstructFollowing: 0.95,
+			ToolUse: true, JSONMode: true, MaxContext: 200000,
+		},
+	}, map[string]router.Threshold{
+		"high":     {MinReasoning: 0.88, MinCoding: 0.85, MinCreative: 0.82, MinInstructFollowing: 0.88},
+		"balanced": {MinReasoning: 0.70, MinCoding: 0.68, MinCreative: 0.65, MinInstructFollowing: 0.72},
+		"cost":     {},
+	})
+	handler := NewHandler(cls, rtr, reg)
+	mux := http.NewServeMux()
+	mux.HandleFunc("POST /v1/chat/completions", handler.ChatCompletions)
+	tsrv := httptest.NewServer(HeaderExtractionMiddleware(mux))
+	defer tsrv.Close()
+
+	body, _ := json.Marshal(types.ChatCompletionRequest{
+		Model:    "auto",
+		Messages: []types.Message{{Role: "user", Content: mustMarshalJSON("Hello")}},
+		Stream:   true,
+	})
+
+	req, _ := http.NewRequest("POST", tsrv.URL+"/v1/chat/completions", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-Frugal-Fallback", "mock-premium")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		b, _ := io.ReadAll(resp.Body)
+		t.Fatalf("expected 200, got %d: %s", resp.StatusCode, string(b))
+	}
+
+	if got := resp.Header.Get("X-Frugal-Model"); got != "mock-premium" {
+		t.Fatalf("expected fallback header model mock-premium, got %q", got)
+	}
+}
+
+func provider2RegistryForFallback(stream bool) *provider.Registry {
+	reg := provider.NewRegistry()
+	m := &mockProvider{
+		name:   "mock",
+		models: []string{"mock-cheap", "mock-premium"},
+		failModels: map[string]bool{
+			"mock-cheap": !stream,
+		},
+		failStreamModels: map[string]bool{
+			"mock-cheap": stream,
+		},
+	}
+	reg.Register(m)
+	return reg
 }
 
 func mustMarshalJSON(v any) json.RawMessage {
