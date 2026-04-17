@@ -368,6 +368,40 @@ func mustMarshalJSON(v any) json.RawMessage {
 	return b
 }
 
+func TestChatCompletions_RejectsUnknownFields(t *testing.T) {
+	_, ts := setupHandler()
+	defer ts.Close()
+
+	body := `{"model":"auto","messages":[{"role":"user","content":"hello"}],"unexpected":true}`
+	resp, err := http.Post(ts.URL+"/v1/chat/completions", "application/json", strings.NewReader(body))
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusBadRequest {
+		b, _ := io.ReadAll(resp.Body)
+		t.Fatalf("expected 400, got %d: %s", resp.StatusCode, string(b))
+	}
+}
+
+func TestChatCompletions_RejectsMultipleJSONObjects(t *testing.T) {
+	_, ts := setupHandler()
+	defer ts.Close()
+
+	body := `{"model":"auto","messages":[{"role":"user","content":"hello"}]}\n{"model":"auto"}`
+	resp, err := http.Post(ts.URL+"/v1/chat/completions", "application/json", strings.NewReader(body))
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusBadRequest {
+		b, _ := io.ReadAll(resp.Body)
+		t.Fatalf("expected 400, got %d: %s", resp.StatusCode, string(b))
+	}
+}
+
 func TestChatCompletions_FallbackAttemptsAreBounded(t *testing.T) {
 	reg := provider.NewRegistry()
 

@@ -3,6 +3,7 @@ package proxy
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"strings"
@@ -50,7 +51,7 @@ func (h *Handler) recordDecision(d types.RoutingDecision) {
 // ChatCompletions handles POST /v1/chat/completions
 func (h *Handler) ChatCompletions(w http.ResponseWriter, r *http.Request) {
 	var req types.ChatCompletionRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err := decodeStrictJSON(r.Body, &req); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid request body: "+err.Error())
 		return
 	}
@@ -227,6 +228,27 @@ func (h *Handler) RoutingExplain(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(d)
+}
+
+func decodeStrictJSON(body io.ReadCloser, dst any) error {
+	defer body.Close()
+
+	dec := json.NewDecoder(body)
+	dec.DisallowUnknownFields()
+
+	if err := dec.Decode(dst); err != nil {
+		return err
+	}
+
+	var extra any
+	if err := dec.Decode(&extra); err != io.EOF {
+		if err == nil {
+			return fmt.Errorf("request body must contain a single JSON object")
+		}
+		return fmt.Errorf("request body must contain a single JSON object: %w", err)
+	}
+
+	return nil
 }
 
 func writeError(w http.ResponseWriter, status int, msg string) {
