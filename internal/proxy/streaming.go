@@ -43,5 +43,10 @@ func streamResponse(w http.ResponseWriter, ch <-chan provider.StreamChunk) error
 		flusher.Flush()
 	}
 
+	// If the upstream channel closes without an explicit Done sentinel,
+	// terminate the SSE stream for OpenAI-compatible clients.
+	fmt.Fprint(w, "data: [DONE]\n\n")
+	flusher.Flush()
+
 	return nil
 }
