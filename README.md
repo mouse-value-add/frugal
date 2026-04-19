@@ -89,6 +89,13 @@ Then set the env var yourself:
 export OPENAI_BASE_URL=http://localhost:8080/v1
 ```
 
+Optional hardening timeouts (Go duration syntax):
+
+- `FRUGAL_READ_HEADER_TIMEOUT` (default `5s`)
+- `FRUGAL_READ_TIMEOUT` (default `15s`)
+- `FRUGAL_WRITE_TIMEOUT` (default `120s`)
+- `FRUGAL_IDLE_TIMEOUT` (default `60s`)
+
 ### Quality thresholds
 
 Control cost vs. quality per request:

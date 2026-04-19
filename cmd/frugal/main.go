@@ -4,6 +4,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 
@@ -108,10 +109,38 @@ func main() {
 		addr = a
 	}
 
+	server := newHTTPServer(addr, r)
+
 	log.Printf("frugal listening on %s", addr)
-	if err := http.ListenAndServe(addr, r); err != nil {
+	if err := server.ListenAndServe(); err != nil {
 		log.Fatalf("server error: %v", err)
 	}
+}
+
+func newHTTPServer(addr string, handler http.Handler) *http.Server {
+	return &http.Server{
+		Addr:              addr,
+		Handler:           handler,
+		ReadHeaderTimeout: envDurationOrDefault("FRUGAL_READ_HEADER_TIMEOUT", 5*time.Second),
+		ReadTimeout:       envDurationOrDefault("FRUGAL_READ_TIMEOUT", 15*time.Second),
+		WriteTimeout:      envDurationOrDefault("FRUGAL_WRITE_TIMEOUT", 120*time.Second),
+		IdleTimeout:       envDurationOrDefault("FRUGAL_IDLE_TIMEOUT", 60*time.Second),
+	}
+}
+
+func envDurationOrDefault(key string, fallback time.Duration) time.Duration {
+	value := os.Getenv(key)
+	if value == "" {
+		return fallback
+	}
+
+	parsed, err := time.ParseDuration(value)
+	if err != nil || parsed <= 0 {
+		log.Printf("warning: invalid %s=%q, using default %s", key, value, fallback)
+		return fallback
+	}
+
+	return parsed
 }
 
 func modelNames(pc config.ProviderConfig) []string {
