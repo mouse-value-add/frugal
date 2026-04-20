@@ -139,14 +139,21 @@ func registerProviders(cfg *config.Config, registry *provider.Registry) {
 
 func injectEnv(environ []string, baseURL string) []string {
 	out := make([]string, 0, len(environ)+2)
-	for _, e := range environ {
-		// Don't override if user already set these
-		out = append(out, e)
-	}
-	// Append — last value wins in most runtimes
-	out = append(out, "OPENAI_BASE_URL="+baseURL)
-	out = append(out, "OPENAI_API_BASE="+baseURL) // older Python SDK
+	out = append(out, environ...)
+	out = upsertEnv(out, "OPENAI_BASE_URL", baseURL)
+	out = upsertEnv(out, "OPENAI_API_BASE", baseURL) // older Python SDK
 	return out
+}
+
+func upsertEnv(environ []string, key, value string) []string {
+	prefix := key + "="
+	for i, e := range environ {
+		if len(e) >= len(prefix) && e[:len(prefix)] == prefix {
+			environ[i] = prefix + value
+			return environ
+		}
+	}
+	return append(environ, prefix+value)
 }
 
 func waitForReady(url string) {
