@@ -154,3 +154,57 @@ Use a hybrid model, open-source core router plus paid managed and enterprise lay
 - Enterprise: custom annual contract (SLA, SSO, private deployment, support).
 
 Pricing should be validated with 10-15 design partners before public launch.
+
+## 16) OSS Marketing and Product Success Plan (Draft)
+
+### Positioning
+Frugal should be positioned as: **Open router for AI agents, local-first cost control with smart escalation**.
+
+### Beachhead ICP
+Start with one primary ICP:
+- OpenClaw power users running multi-model agent workflows with recurring cron/reporting jobs.
+
+### Product-Led Adoption
+- Ship a 10-minute quickstart that demonstrates:
+  1. Local model handles simple prompts.
+  2. Complex prompts escalate automatically.
+  3. Cost and latency impact are measurable immediately.
+- Provide starter configs for common policy profiles:
+  - local-first
+  - balanced
+  - quality-first
+
+### Proof and Credibility
+- Publish a reproducible benchmark suite comparing “with Frugal” vs “without Frugal” on identical workloads.
+- Report at least: cost/request, p50/p95 latency, escalation rate, and quality proxy metrics.
+- Keep benchmark scripts public and runnable to build trust.
+
+### Distribution Loops
+- “Built with Frugal” badge for downstream OSS projects.
+- Weekly short case studies with before/after routing metrics.
+- Integration templates for adjacent ecosystems (for example OpenClaw, LiteLLM, LangGraph-style workflows).
+
+### Reliability as Differentiator
+Prioritize operator trust features over surface-level feature count:
+- deterministic reason codes for routing decisions
+- robust logs/traces for each route/escalation
+- bounded fallback behavior with explicit failure semantics
+
+### Community Motions
+- Curate “good first issue” and “routing policy recipe” issues.
+- Hold monthly office hours and publish contributor highlights.
+- Maintain fast maintainer response cadence for early community growth.
+
+### 90-Day Execution Priorities
+1. Positioning and docs refresh.
+2. Benchmark harness plus public results page.
+3. OpenClaw-focused integration guide and starter configs.
+4. 2-5 design partners and quote-backed case studies.
+5. Launch package: HN post, X thread, and short demo video.
+
+### Success KPIs (90 days)
+- GitHub stars and weekly active contributors.
+- Number of active installs/workspaces.
+- Share of requests handled by local tier with acceptable quality.
+- Cost reduction achieved by pilot users.
+- Time-to-first-value from install to first successful routed workflow.
