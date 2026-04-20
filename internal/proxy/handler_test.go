@@ -4,10 +4,12 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -22,13 +24,29 @@ type mockProvider struct {
 	name      string
 	models    []string
 	response  *types.ChatCompletionResponse
+	chatErr   error
 	streamErr error
+
+	mu              sync.Mutex
+	chatCalls       int
+	streamCalls     int
+	lastChatModel   string
+	lastStreamModel string
 }
 
 func (m *mockProvider) Name() string    { return m.name }
 func (m *mockProvider) Models() []string { return m.models }
 
 func (m *mockProvider) ChatCompletion(ctx context.Context, model string, req *types.ChatCompletionRequest) (*types.ChatCompletionResponse, error) {
+	m.mu.Lock()
+	m.chatCalls++
+	m.lastChatModel = model
+	m.mu.Unlock()
+
+	if m.chatErr != nil {
+		return nil, m.chatErr
+	}
+
 	if m.response != nil {
 		return m.response, nil
 	}
@@ -51,6 +69,11 @@ func (m *mockProvider) ChatCompletion(ctx context.Context, model string, req *ty
 }
 
 func (m *mockProvider) ChatCompletionStream(ctx context.Context, model string, req *types.ChatCompletionRequest) (<-chan provider.StreamChunk, error) {
+	m.mu.Lock()
+	m.streamCalls++
+	m.lastStreamModel = model
+	m.mu.Unlock()
+
 	if m.streamErr != nil {
 		return nil, m.streamErr
 	}
@@ -87,6 +110,18 @@ func (m *mockProvider) ChatCompletionStream(ctx context.Context, model string, r
 		ch <- provider.StreamChunk{Done: true}
 	}()
 	return ch, nil
+}
+
+func (m *mockProvider) ChatCallCount() int {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.chatCalls
+}
+
+func (m *mockProvider) LastChatModel() string {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.lastChatModel
 }
 
 func setupHandler() (*Handler, *httptest.Server) {
@@ -225,6 +260,41 @@ func TestChatCompletions_ModelPinning(t *testing.T) {
 	}
 }
 
+func TestChatCompletions_ModelPinningUnknownModelReturnsBadRequest(t *testing.T) {
+	_, ts := setupHandler()
+	defer ts.Close()
+
+	body, _ := json.Marshal(types.ChatCompletionRequest{
+		Model:    "does-not-exist",
+		Messages: []types.Message{{Role: "user", Content: mustMarshalJSON("Hello")}},
+	})
+
+	resp, err := http.Post(ts.URL+"/v1/chat/completions", "application/json", bytes.NewReader(body))
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusBadRequest {
+		b, _ := io.ReadAll(resp.Body)
+		t.Fatalf("expected 400, got %d: %s", resp.StatusCode, string(b))
+	}
+
+	if got := resp.Header.Get("X-Frugal-Model"); got != "" {
+		t.Fatalf("expected no X-Frugal-Model header on error, got %s", got)
+	}
+
+	var payload map[string]any
+	if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
+		t.Fatalf("decode error: %v", err)
+	}
+	errObj, _ := payload["error"].(map[string]any)
+	msg, _ := errObj["message"].(string)
+	if !strings.Contains(msg, "unknown pinned model") {
+		t.Fatalf("expected unknown pinned model message, got %q", msg)
+	}
+}
+
 func TestChatCompletions_QualityHeader(t *testing.T) {
 	_, ts := setupHandler()
 	defer ts.Close()
@@ -331,4 +401,56 @@ func TestRoutingExplain_AfterRequest(t *testing.T) {
 func mustMarshalJSON(v any) json.RawMessage {
 	b, _ := json.Marshal(v)
 	return b
+}
+
+func TestChatCompletions_FallbackAttemptsAreBounded(t *testing.T) {
+	reg := provider.NewRegistry()
+
+	failing := &mockProvider{name: "failing", models: []string{"primary", "fb1", "fb2", "fb3", "fb4"}, chatErr: errors.New("boom")}
+	reg.Register(failing)
+
+	models := []router.ModelEntry{{
+		Name: "primary", Provider: "failing",
+		CostPer1KInput: 0.0001, CostPer1KOutput: 0.0002,
+		Reasoning: 0.8, Coding: 0.8, Creative: 0.8, InstructFollowing: 0.8,
+		ToolUse: true, JSONMode: true, MaxContext: 128000,
+	}}
+	thresholds := map[string]router.Threshold{
+		"balanced": {MinReasoning: 0.1, MinCoding: 0.1, MinCreative: 0.1, MinInstructFollowing: 0.1},
+	}
+
+	h := NewHandler(classifier.NewRuleBased(), router.New(models, thresholds), reg)
+	mux := http.NewServeMux()
+	mux.HandleFunc("POST /v1/chat/completions", h.ChatCompletions)
+	ts := httptest.NewServer(HeaderExtractionMiddleware(mux))
+	defer ts.Close()
+
+	body, _ := json.Marshal(types.ChatCompletionRequest{
+		Model:    "auto",
+		Messages: []types.Message{{Role: "user", Content: mustMarshalJSON("Hello")}},
+	})
+	req, _ := http.NewRequest("POST", ts.URL+"/v1/chat/completions", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-Frugal-Fallback", "fb1,fb2,fb3,fb4")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusBadGateway {
+		b, _ := io.ReadAll(resp.Body)
+		t.Fatalf("expected 502, got %d: %s", resp.StatusCode, string(b))
+	}
+
+	// 1 primary attempt + maxFallbackAttempts fallbacks.
+	wantCalls := 1 + maxFallbackAttempts
+	if got := failing.ChatCallCount(); got != wantCalls {
+		t.Fatalf("expected %d total attempts, got %d", wantCalls, got)
+	}
+
+	if got := failing.LastChatModel(); got != "fb3" {
+		t.Fatalf("expected last attempted fallback model fb3, got %s", got)
+	}
 }
