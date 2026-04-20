@@ -260,6 +260,41 @@ func TestChatCompletions_ModelPinning(t *testing.T) {
 	}
 }
 
+func TestChatCompletions_ModelPinningUnknownModelReturnsBadRequest(t *testing.T) {
+	_, ts := setupHandler()
+	defer ts.Close()
+
+	body, _ := json.Marshal(types.ChatCompletionRequest{
+		Model:    "does-not-exist",
+		Messages: []types.Message{{Role: "user", Content: mustMarshalJSON("Hello")}},
+	})
+
+	resp, err := http.Post(ts.URL+"/v1/chat/completions", "application/json", bytes.NewReader(body))
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusBadRequest {
+		b, _ := io.ReadAll(resp.Body)
+		t.Fatalf("expected 400, got %d: %s", resp.StatusCode, string(b))
+	}
+
+	if got := resp.Header.Get("X-Frugal-Model"); got != "" {
+		t.Fatalf("expected no X-Frugal-Model header on error, got %s", got)
+	}
+
+	var payload map[string]any
+	if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
+		t.Fatalf("decode error: %v", err)
+	}
+	errObj, _ := payload["error"].(map[string]any)
+	msg, _ := errObj["message"].(string)
+	if !strings.Contains(msg, "unknown pinned model") {
+		t.Fatalf("expected unknown pinned model message, got %q", msg)
+	}
+}
+
 func TestChatCompletions_QualityHeader(t *testing.T) {
 	_, ts := setupHandler()
 	defer ts.Close()

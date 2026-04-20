@@ -72,6 +72,9 @@ func (h *Handler) ChatCompletions(w http.ResponseWriter, r *http.Request) {
 				Pinned:           true,
 				Reason:           fmt.Sprintf("model pinned to %s", req.Model),
 			}
+		} else {
+			writeError(w, http.StatusBadRequest, "unknown pinned model: "+req.Model)
+			return
 		}
 	}
 
