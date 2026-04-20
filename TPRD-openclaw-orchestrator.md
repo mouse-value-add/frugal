@@ -3,6 +3,7 @@
 - **Author:** Mouse
 - **Date:** 2026-04-20
 - **Status:** Draft (for implementation planning)
+- **Reviewer:** 
 
 ## 1) Problem
 OpenClaw users need low-latency, low-cost handling for routine conversations and periodic reporting tasks, while still getting high-capability models for coding and complex reasoning. Today this can be assembled manually, but there is no opinionated orchestration blueprint that standardizes routing behavior, escalation criteria, and observability.
