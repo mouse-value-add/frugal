@@ -114,3 +114,43 @@ Attach structured routing metadata per request:
 - [ ] Add routing eval harness and baseline dataset.
 - [ ] Add docs with operator presets (local-first, balanced, quality-first).
 
+
+## 14) Monetization & Packaging Strategy
+
+### Recommendation
+Use a hybrid model, open-source core router plus paid managed and enterprise layers.
+
+### Open Source (Free Core)
+- Core routing engine (policy-based model selection)
+- Intent classification contract
+- Local-first support (for example Gemma-class via local runtime)
+- Basic logs and reason codes
+- Self-host deployment path
+
+### Paid: Pro and Team Cloud
+- Hosted control plane for policy management and rollouts
+- Routing analytics dashboard (latency, quality proxy, cost by intent)
+- Budget controls, anomaly alerts, and cron health reporting
+- Managed evals and policy recommendations
+- Team collaboration features (workspaces, shared presets)
+
+### Paid: Enterprise
+- RBAC, SSO/SAML, and granular audit logs
+- Approval workflows and policy guardrails
+- Private VPC/on-prem deployment options
+- SLA, priority support, and onboarding
+- Compliance support packages (as needed)
+
+### Why this model
+- OSS drives trust, adoption, and integrations in the OpenClaw ecosystem.
+- Paid layers monetize operational complexity, governance, and reliability at scale.
+- It keeps hobbyist entry friction low while creating clear enterprise upgrade paths.
+
+## 15) Example Pricing (Draft)
+
+- Free (OSS/self-host): $0, bring your own infra/models.
+- Pro: $49-99/month per workspace, includes hosted control plane plus analytics and alerting.
+- Team: $299-999/month, adds collaboration, advanced budgets, and deeper observability.
+- Enterprise: custom annual contract (SLA, SSO, private deployment, support).
+
+Pricing should be validated with 10-15 design partners before public launch.
