@@ -89,6 +89,14 @@ Then set the env var yourself:
 export OPENAI_BASE_URL=http://localhost:8080/v1
 ```
 
+Optional hardening timeouts (Go duration syntax):
+
+- `FRUGAL_READ_HEADER_TIMEOUT` (default `5s`)
+- `FRUGAL_READ_TIMEOUT` (default `15s`)
+- `FRUGAL_WRITE_TIMEOUT` (default `120s`)
+- `FRUGAL_IDLE_TIMEOUT` (default `60s`)
+- `FRUGAL_MAX_HEADER_BYTES` (default `1048576`)
+
 ### Quality thresholds
 
 Control cost vs. quality per request:
@@ -121,6 +129,7 @@ headers = {"X-Frugal-Fallback": "gpt-4o,claude-sonnet-4-20250514,gemini-2.5-flas
 ```
 
 If the routed model errors, Frugal walks the chain.
+To bound latency and cost, Frugal attempts at most the first 3 fallback models.
 
 ## Supported models
 

@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"log"
 	"net"
 	"net/http"
@@ -47,6 +48,11 @@ func runWrap(configPath string, args []string) int {
 
 	cls := classifier.NewRuleBased()
 	modelEntries, thresholds := router.BuildTaxonomy(cfg)
+	modelEntries = filterRegisteredModels(modelEntries, registry)
+	if len(modelEntries) == 0 {
+		fmt.Fprintln(os.Stderr, "frugal: no routable models available for registered providers")
+		return 1
+	}
 	rtr := router.New(modelEntries, thresholds)
 	h := proxy.NewHandler(cls, rtr, registry)
 
@@ -77,7 +83,11 @@ func runWrap(configPath string, args []string) int {
 	}()
 
 	// Wait for proxy to be ready
-	waitForReady(fmt.Sprintf("http://127.0.0.1:%d/health", port))
+	if err := waitForReady(fmt.Sprintf("http://127.0.0.1:%d/health", port), 2*time.Second); err != nil {
+		fmt.Fprintf(os.Stderr, "frugal: proxy failed health check: %v\n", err)
+		server.Close()
+		return 1
+	}
 
 	fmt.Fprintf(os.Stderr, "frugal: proxy running on :%d → routing across %d models\n", port, len(registry.AllModels()))
 
@@ -144,13 +154,21 @@ func injectEnv(environ []string, baseURL string) []string {
 	return out
 }
 
-func waitForReady(url string) {
-	for i := 0; i < 50; i++ {
-		resp, err := http.Get(url)
+func waitForReady(url string, timeout time.Duration) error {
+	client := &http.Client{Timeout: 200 * time.Millisecond}
+	deadline := time.Now().Add(timeout)
+
+	for time.Now().Before(deadline) {
+		resp, err := client.Get(url)
 		if err == nil {
+			io.Copy(io.Discard, resp.Body)
 			resp.Body.Close()
-			return
+			if resp.StatusCode >= http.StatusOK && resp.StatusCode < http.StatusMultipleChoices {
+				return nil
+			}
 		}
-		time.Sleep(10 * time.Millisecond)
+		time.Sleep(25 * time.Millisecond)
 	}
+
+	return fmt.Errorf("timed out waiting for %s after %s", url, timeout)
 }
