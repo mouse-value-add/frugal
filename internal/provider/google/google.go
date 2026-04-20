@@ -14,6 +14,19 @@ import (
 	"github.com/frugalsh/frugal/internal/types"
 )
 
+const errorBodyLimit = 8 << 10 // 8 KiB
+
+func readErrorBody(r io.Reader) string {
+	body, err := io.ReadAll(io.LimitReader(r, errorBodyLimit+1))
+	if err != nil {
+		return "<failed to read error body>"
+	}
+	if len(body) > errorBodyLimit {
+		return string(body[:errorBodyLimit]) + "... (truncated)"
+	}
+	return string(body)
+}
+
 type Provider struct {
 	apiKey  string
 	baseURL string
@@ -37,9 +50,9 @@ func (p *Provider) Models() []string { return p.models }
 // -- Gemini API types --
 
 type generateContentRequest struct {
-	Contents          []geminiContent    `json:"contents"`
-	SystemInstruction *geminiContent     `json:"systemInstruction,omitempty"`
-	GenerationConfig  *generationConfig  `json:"generationConfig,omitempty"`
+	Contents          []geminiContent   `json:"contents"`
+	SystemInstruction *geminiContent    `json:"systemInstruction,omitempty"`
+	GenerationConfig  *generationConfig `json:"generationConfig,omitempty"`
 }
 
 type geminiContent struct {
@@ -52,11 +65,11 @@ type geminiPart struct {
 }
 
 type generationConfig struct {
-	Temperature     *float64 `json:"temperature,omitempty"`
-	TopP            *float64 `json:"topP,omitempty"`
-	MaxOutputTokens *int     `json:"maxOutputTokens,omitempty"`
-	StopSequences   []string `json:"stopSequences,omitempty"`
-	ResponseMimeType string  `json:"responseMimeType,omitempty"`
+	Temperature      *float64 `json:"temperature,omitempty"`
+	TopP             *float64 `json:"topP,omitempty"`
+	MaxOutputTokens  *int     `json:"maxOutputTokens,omitempty"`
+	StopSequences    []string `json:"stopSequences,omitempty"`
+	ResponseMimeType string   `json:"responseMimeType,omitempty"`
 }
 
 type generateContentResponse struct {
@@ -200,8 +213,7 @@ func (p *Provider) ChatCompletion(ctx context.Context, model string, req *types.
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		respBody, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("gemini error %d: %s", resp.StatusCode, string(respBody))
+		return nil, fmt.Errorf("gemini error %d: %s", resp.StatusCode, readErrorBody(resp.Body))
 	}
 
 	var result generateContentResponse
@@ -234,8 +246,7 @@ func (p *Provider) ChatCompletionStream(ctx context.Context, model string, req *
 
 	if resp.StatusCode != http.StatusOK {
 		defer resp.Body.Close()
-		respBody, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("gemini error %d: %s", resp.StatusCode, string(respBody))
+		return nil, fmt.Errorf("gemini error %d: %s", resp.StatusCode, readErrorBody(resp.Body))
 	}
 
 	ch := make(chan provider.StreamChunk, 8)
