@@ -34,7 +34,7 @@ type mockProvider struct {
 	lastStreamModel string
 }
 
-func (m *mockProvider) Name() string    { return m.name }
+func (m *mockProvider) Name() string     { return m.name }
 func (m *mockProvider) Models() []string { return m.models }
 
 func (m *mockProvider) ChatCompletion(ctx context.Context, model string, req *types.ChatCompletionRequest) (*types.ChatCompletionResponse, error) {
@@ -122,6 +122,12 @@ func (m *mockProvider) LastChatModel() string {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	return m.lastChatModel
+}
+
+func (m *mockProvider) StreamCallCount() int {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.streamCalls
 }
 
 func setupHandler() (*Handler, *httptest.Server) {
@@ -417,5 +423,56 @@ func TestChatCompletions_FallbackAttemptsAreBounded(t *testing.T) {
 
 	if got := failing.LastChatModel(); got != "fb3" {
 		t.Fatalf("expected last attempted fallback model fb3, got %s", got)
+	}
+}
+
+func TestChatCompletions_FallbackSkipsPrimaryAndDuplicates(t *testing.T) {
+	reg := provider.NewRegistry()
+
+	failing := &mockProvider{name: "failing", models: []string{"primary", "fb1", "fb2"}, chatErr: errors.New("boom")}
+	reg.Register(failing)
+
+	models := []router.ModelEntry{{
+		Name: "primary", Provider: "failing",
+		CostPer1KInput: 0.0001, CostPer1KOutput: 0.0002,
+		Reasoning: 0.8, Coding: 0.8, Creative: 0.8, InstructFollowing: 0.8,
+		ToolUse: true, JSONMode: true, MaxContext: 128000,
+	}}
+	thresholds := map[string]router.Threshold{
+		"balanced": {MinReasoning: 0.1, MinCoding: 0.1, MinCreative: 0.1, MinInstructFollowing: 0.1},
+	}
+
+	h := NewHandler(classifier.NewRuleBased(), router.New(models, thresholds), reg)
+	mux := http.NewServeMux()
+	mux.HandleFunc("POST /v1/chat/completions", h.ChatCompletions)
+	ts := httptest.NewServer(HeaderExtractionMiddleware(mux))
+	defer ts.Close()
+
+	body, _ := json.Marshal(types.ChatCompletionRequest{
+		Model:    "auto",
+		Messages: []types.Message{{Role: "user", Content: mustMarshalJSON("Hello")}},
+	})
+	req, _ := http.NewRequest("POST", ts.URL+"/v1/chat/completions", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-Frugal-Fallback", "primary,fb1,fb1,fb2")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusBadGateway {
+		b, _ := io.ReadAll(resp.Body)
+		t.Fatalf("expected 502, got %d: %s", resp.StatusCode, string(b))
+	}
+
+	// 1 primary attempt + 2 unique fallback attempts (fb1, fb2).
+	if got := failing.ChatCallCount(); got != 3 {
+		t.Fatalf("expected 3 total attempts, got %d", got)
+	}
+
+	if got := failing.LastChatModel(); got != "fb2" {
+		t.Fatalf("expected last attempted fallback model fb2, got %s", got)
 	}
 }
