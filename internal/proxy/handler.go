@@ -2,7 +2,9 @@ package proxy
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"strings"
@@ -47,10 +49,12 @@ func (h *Handler) recordDecision(d types.RoutingDecision) {
 	h.lastDecision = &d
 }
 
+const maxChatCompletionsBodyBytes int64 = 1 << 20 // 1 MiB
+
 // ChatCompletions handles POST /v1/chat/completions
 func (h *Handler) ChatCompletions(w http.ResponseWriter, r *http.Request) {
-	var req types.ChatCompletionRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	req, err := decodeChatCompletionRequest(w, r)
+	if err != nil {
 		writeError(w, http.StatusBadRequest, "invalid request body: "+err.Error())
 		return
 	}
@@ -77,7 +81,7 @@ func (h *Handler) ChatCompletions(w http.ResponseWriter, r *http.Request) {
 
 	// Route via classifier if not pinned
 	if prov == nil {
-		features := h.classifier.Classify(&req)
+		features := h.classifier.Classify(req)
 		decision = h.router.Route(features, quality, fallbacks)
 
 		if decision.SelectedModel == "" {
@@ -100,10 +104,40 @@ func (h *Handler) ChatCompletions(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("X-Frugal-Provider", decision.SelectedProvider)
 
 	if req.Stream {
-		h.handleStream(w, r, prov, decision, &req, fallbacks)
+		h.handleStream(w, r, prov, decision, req, fallbacks)
 	} else {
-		h.handleNonStream(w, r, prov, decision, &req, fallbacks)
+		h.handleNonStream(w, r, prov, decision, req, fallbacks)
 	}
+}
+
+func decodeChatCompletionRequest(w http.ResponseWriter, r *http.Request) (*types.ChatCompletionRequest, error) {
+	r.Body = http.MaxBytesReader(w, r.Body, maxChatCompletionsBodyBytes)
+	defer r.Body.Close()
+
+	dec := json.NewDecoder(r.Body)
+	dec.DisallowUnknownFields()
+
+	var req types.ChatCompletionRequest
+	if err := dec.Decode(&req); err != nil {
+		var syntaxErr *json.SyntaxError
+		var typeErr *json.UnmarshalTypeError
+		switch {
+		case errors.As(err, &syntaxErr):
+			return nil, fmt.Errorf("malformed JSON")
+		case errors.Is(err, io.EOF):
+			return nil, fmt.Errorf("empty request body")
+		case errors.As(err, &typeErr):
+			return nil, fmt.Errorf("invalid value for field %q", typeErr.Field)
+		default:
+			return nil, err
+		}
+	}
+
+	if err := dec.Decode(&struct{}{}); err != io.EOF {
+		return nil, fmt.Errorf("request body must contain a single JSON object")
+	}
+
+	return &req, nil
 }
 
 func (h *Handler) handleNonStream(w http.ResponseWriter, r *http.Request, prov provider.Provider, decision types.RoutingDecision, req *types.ChatCompletionRequest, fallbacks []string) {
