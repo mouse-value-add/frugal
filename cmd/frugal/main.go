@@ -53,6 +53,8 @@ func main() {
 				log.Fatalf("sync failed: %v", err)
 			}
 			return
+		case "bench":
+			os.Exit(runBench(configPath, os.Args[2:]))
 		case "serve":
 			// fall through to server startup
 		default:
@@ -208,6 +210,7 @@ Usage:
   frugal <command> [args...]     Wrap any command with the routing proxy
   frugal serve                   Run the proxy as a persistent server
   frugal sync                    Refresh model pricing from models.dev
+  frugal bench [flags]           Run cost + quality benchmark against providers
   frugal -v | --version          Print the build version
   frugal -h | --help             Show this help
 

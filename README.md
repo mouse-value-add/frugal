@@ -14,7 +14,33 @@ curl -fsSL https://frugal.sh/install | sh
 frugal python my_app.py
 ```
 
-That's it. Frugal starts a local proxy, injects `OPENAI_BASE_URL`, runs your command, and shuts down when it exits. Your app doesn't change. Your API keys stay local. Your bill drops 40-70%.
+That's it. Frugal starts a local proxy, injects `OPENAI_BASE_URL`, runs your command, and shuts down when it exits. Your app doesn't change. Your API keys stay local.
+
+## How much does it actually save?
+
+Run the benchmark on your own keys:
+
+```bash
+frugal bench --quality balanced --out bench.md
+```
+
+Frugal runs every problem in `config/workloads/starter.yaml` twice — once
+through the router (cheapest model that clears your quality bar) and once
+pinned to the baseline model. It scores each output against a deterministic
+scorer (exact match, substring, JSON schema, or numeric tolerance) and prints
+a report like:
+
+```
+# starter (quality=balanced, baseline=gpt-4o)
+
+Problems: 20  ·  Frugal pass: 90.0%  ·  Baseline pass: 95.0%  ·  Δ: -5.0pp
+Cost: frugal $0.0043  ·  baseline $0.0118  ·  savings 63.6%
+```
+
+No judge LLMs, no simulated numbers — these are the bytes your provider
+billed you for. See [`config/workloads/starter.yaml`](./config/workloads/starter.yaml)
+for the problem set and [`config/CAPABILITIES.md`](./config/CAPABILITIES.md)
+for the methodology behind the capability scores the router uses.
 
 ---
 
