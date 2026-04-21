@@ -4,7 +4,7 @@ set -euo pipefail
 # frugal.sh installer
 # Usage: curl -fsSL https://frugal.sh/install | sh
 
-REPO="frugalsh/frugal"
+REPO="brainsparker/frugal"
 INSTALL_DIR="${FRUGAL_INSTALL_DIR:-$HOME/.frugal}"
 BIN_DIR="$INSTALL_DIR/bin"
 CONFIG_DIR="$INSTALL_DIR/config"
