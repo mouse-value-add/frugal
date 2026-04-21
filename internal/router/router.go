@@ -30,9 +30,14 @@ func (r *Router) Route(features types.QueryFeatures, quality types.QualityThresh
 		candidates = append(candidates, m)
 	}
 
+	var relaxedFrom string
 	if len(candidates) == 0 {
-		// Fallback: relax threshold to balanced, then cost
+		// Fallback: relax threshold to balanced, then cost. Record the
+		// original quality so callers can surface a degraded-routing signal.
 		for _, fallbackQuality := range []types.QualityThreshold{types.QualityBalanced, types.QualityCost} {
+			if fallbackQuality == quality {
+				continue
+			}
 			ft := r.thresholdForQuality(fallbackQuality)
 			for _, m := range r.models {
 				if r.meetsRequirements(m, features, ft) {
@@ -40,21 +45,27 @@ func (r *Router) Route(features types.QueryFeatures, quality types.QualityThresh
 				}
 			}
 			if len(candidates) > 0 {
+				relaxedFrom = string(quality)
 				break
 			}
 		}
 	}
 
 	if len(candidates) == 0 {
-		// Last resort: pick the cheapest model that has hard requirements
+		// Last resort: pick the cheapest model that satisfies only the hard
+		// requirements. This is strictly weaker than any threshold, so
+		// RelaxedFrom is set if it wasn't already.
 		candidates = r.filterHardRequirements(features)
+		if len(candidates) > 0 && relaxedFrom == "" {
+			relaxedFrom = string(quality)
+		}
 	}
 
 	if len(candidates) == 0 {
 		return types.RoutingDecision{
-			Quality: string(quality),
+			Quality:  string(quality),
 			Features: features,
-			Reason:  "no models available",
+			Reason:   "no models available",
 		}
 	}
 
@@ -68,6 +79,7 @@ func (r *Router) Route(features types.QueryFeatures, quality types.QualityThresh
 		SelectedModel:    selected.Name,
 		SelectedProvider: selected.Provider,
 		Quality:          string(quality),
+		RelaxedFrom:      relaxedFrom,
 		Features:         features,
 		Candidates:       len(candidates),
 		Reason:           r.buildReason(selected, features, quality),

@@ -44,6 +44,10 @@ type RoutingDecision struct {
 	SelectedModel    string        `json:"selected_model"`
 	SelectedProvider string        `json:"selected_provider"`
 	Quality          string        `json:"quality_threshold"`
+	// RelaxedFrom is set when no model met the requested threshold and the
+	// router fell through to a lower tier. Clients can alarm on it instead
+	// of treating degraded routing as a clean win.
+	RelaxedFrom      string        `json:"relaxed_from,omitempty"`
 	Features         QueryFeatures `json:"features"`
 	Candidates       int           `json:"candidates_considered"`
 	Reason           string        `json:"reason"`

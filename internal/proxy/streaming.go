@@ -1,16 +1,61 @@
 package proxy
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
 
+	"github.com/frugalsh/frugal/internal/obs"
 	"github.com/frugalsh/frugal/internal/provider"
 )
 
-// streamResponse writes SSE chunks from a provider stream channel to the HTTP response.
-func streamResponse(w http.ResponseWriter, ch <-chan provider.StreamChunk) error {
+// streamResponseWithFirst writes a buffered first chunk followed by the rest
+// of the stream. Splitting the first chunk out lets the handler retry to a
+// fallback model on first-chunk failure before any bytes are sent to the
+// client; once the first chunk lands, the stream is irrevocable.
+func streamResponseWithFirst(ctx context.Context, w http.ResponseWriter, first *provider.StreamChunk, ch <-chan provider.StreamChunk) error {
+	flusher, ok := w.(http.Flusher)
+	if !ok {
+		return fmt.Errorf("streaming not supported")
+	}
+
+	w.Header().Set("Content-Type", "text/event-stream")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("Connection", "keep-alive")
+	w.WriteHeader(http.StatusOK)
+	flusher.Flush()
+
+	if first != nil {
+		if err := writeSSEChunk(ctx, w, flusher, *first); err != nil {
+			return err
+		}
+		if first.Done {
+			return nil
+		}
+	}
+
+	for chunk := range ch {
+		if err := writeSSEChunk(ctx, w, flusher, chunk); err != nil {
+			return err
+		}
+		if chunk.Done || chunk.Err != nil {
+			return chunk.Err
+		}
+	}
+
+	// Some providers close the stream channel without sending an explicit Done.
+	// Emit the OpenAI-compatible terminator so clients don't wait indefinitely.
+	if _, err := fmt.Fprint(w, "data: [DONE]\n\n"); err != nil {
+		return err
+	}
+	flusher.Flush()
+	return nil
+}
+
+// streamResponse is retained for tests that don't need the split first-chunk
+// path. Prefer streamResponseWithFirst in production handler code.
+func streamResponse(ctx context.Context, w http.ResponseWriter, ch <-chan provider.StreamChunk) error {
 	flusher, ok := w.(http.Flusher)
 	if !ok {
 		return fmt.Errorf("streaming not supported")
@@ -24,7 +69,7 @@ func streamResponse(w http.ResponseWriter, ch <-chan provider.StreamChunk) error
 
 	for chunk := range ch {
 		if chunk.Err != nil {
-			log.Printf("stream upstream error: %v", chunk.Err)
+			obs.L(ctx).Error("stream upstream error", "err", chunk.Err)
 			errData := fmt.Sprintf(`{"error":{"message":%q,"type":"frugal_error"}}`, sanitizedUpstreamMessage(chunk.Err))
 			if _, err := fmt.Fprintf(w, "data: %s\n\n", errData); err != nil {
 				return err
@@ -54,6 +99,37 @@ func streamResponse(w http.ResponseWriter, ch <-chan provider.StreamChunk) error
 	// Some providers close the stream channel without sending an explicit Done chunk.
 	// Emit the OpenAI-compatible terminator so clients don't wait indefinitely.
 	if _, err := fmt.Fprint(w, "data: [DONE]\n\n"); err != nil {
+		return err
+	}
+	flusher.Flush()
+	return nil
+}
+
+// writeSSEChunk serializes a single StreamChunk to the wire. Error chunks
+// collapse to a sanitized frame; Done triggers a [DONE] terminator; normal
+// chunks emit a JSON event.
+func writeSSEChunk(ctx context.Context, w http.ResponseWriter, flusher http.Flusher, chunk provider.StreamChunk) error {
+	if chunk.Err != nil {
+		obs.L(ctx).Error("stream upstream error", "err", chunk.Err)
+		errData := fmt.Sprintf(`{"error":{"message":%q,"type":"frugal_error"}}`, sanitizedUpstreamMessage(chunk.Err))
+		if _, err := fmt.Fprintf(w, "data: %s\n\n", errData); err != nil {
+			return err
+		}
+		flusher.Flush()
+		return nil
+	}
+	if chunk.Done {
+		if _, err := fmt.Fprint(w, "data: [DONE]\n\n"); err != nil {
+			return err
+		}
+		flusher.Flush()
+		return nil
+	}
+	data, err := json.Marshal(chunk.Data)
+	if err != nil {
+		return nil
+	}
+	if _, err := fmt.Fprintf(w, "data: %s\n\n", data); err != nil {
 		return err
 	}
 	flusher.Flush()

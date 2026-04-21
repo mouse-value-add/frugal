@@ -3,7 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 	"os"
 	"path/filepath"
 
@@ -23,13 +23,13 @@ var modelAliases = map[string][]string{
 }
 
 func runSync(configPath string) error {
-	log.Println("fetching model pricing from models.dev...")
+	slog.Info("fetching model pricing from models.dev")
 
 	catalog, err := msync.FetchModels(context.Background())
 	if err != nil {
 		return fmt.Errorf("fetch failed: %w", err)
 	}
-	log.Printf("fetched %d model entries from models.dev", len(catalog))
+	slog.Info("fetched models.dev catalog", "entries", len(catalog))
 
 	cfg, err := config.Load(configPath)
 	if err != nil {
@@ -43,21 +43,22 @@ func runSync(configPath string) error {
 		for modelName, mc := range pc.Models {
 			entry, found := lookupModel(catalog, providerName, modelName)
 			if !found {
-				log.Printf("  [skip] %s/%s — not found in models.dev", providerName, modelName)
+				slog.Info("sync skipped", "provider", providerName, "model", modelName, "reason", "not_in_catalog")
 				notFound++
 				continue
 			}
 
 			changed := false
+			logger := slog.With("provider", providerName, "model", modelName)
 
 			if entry.Cost != nil {
 				newInput := msync.CostPer1K(entry.Cost.Input)
 				newOutput := msync.CostPer1K(entry.Cost.Output)
 				if newInput != mc.CostPer1KInput || newOutput != mc.CostPer1KOutput {
-					log.Printf("  [update] %s/%s: input $%.6f→$%.6f, output $%.6f→$%.6f per 1K tokens",
-						providerName, modelName,
-						mc.CostPer1KInput, newInput,
-						mc.CostPer1KOutput, newOutput)
+					logger.Info("cost updated",
+						"input_from", mc.CostPer1KInput, "input_to", newInput,
+						"output_from", mc.CostPer1KOutput, "output_to", newOutput,
+					)
 					mc.CostPer1KInput = newInput
 					mc.CostPer1KOutput = newOutput
 					changed = true
@@ -65,19 +66,18 @@ func runSync(configPath string) error {
 			}
 
 			if entry.Limit != nil && entry.Limit.Context > 0 && entry.Limit.Context != mc.Capabilities.MaxContext {
-				log.Printf("  [update] %s/%s: context %d→%d",
-					providerName, modelName, mc.Capabilities.MaxContext, entry.Limit.Context)
+				logger.Info("context updated", "from", mc.Capabilities.MaxContext, "to", entry.Limit.Context)
 				mc.Capabilities.MaxContext = entry.Limit.Context
 				changed = true
 			}
 
 			if entry.ToolCall != mc.Capabilities.ToolUse {
-				log.Printf("  [update] %s/%s: tool_use %v→%v", providerName, modelName, mc.Capabilities.ToolUse, entry.ToolCall)
+				logger.Info("tool_use updated", "from", mc.Capabilities.ToolUse, "to", entry.ToolCall)
 				mc.Capabilities.ToolUse = entry.ToolCall
 				changed = true
 			}
 			if entry.StructuredOutput != mc.Capabilities.JSONMode {
-				log.Printf("  [update] %s/%s: json_mode %v→%v", providerName, modelName, mc.Capabilities.JSONMode, entry.StructuredOutput)
+				logger.Info("json_mode updated", "from", mc.Capabilities.JSONMode, "to", entry.StructuredOutput)
 				mc.Capabilities.JSONMode = entry.StructuredOutput
 				changed = true
 			}
@@ -86,19 +86,19 @@ func runSync(configPath string) error {
 				pc.Models[modelName] = mc
 				updated++
 			} else {
-				log.Printf("  [ok] %s/%s — up to date", providerName, modelName)
+				logger.Debug("model up to date")
 			}
 		}
 		cfg.Providers[providerName] = pc
 	}
 
-	log.Printf("updated %d models, %d not found in catalog", updated, notFound)
+	slog.Info("sync complete", "updated", updated, "not_found", notFound)
 
 	if updated > 0 {
 		return writeConfig(configPath, cfg)
 	}
 
-	log.Println("no changes needed")
+	slog.Info("sync: no changes")
 	return nil
 }
 
@@ -172,6 +172,6 @@ func writeConfig(path string, cfg *config.Config) error {
 		return fmt.Errorf("rename tempfile: %w", err)
 	}
 
-	log.Printf("wrote updated config to %s", path)
+	slog.Info("wrote config", "path", path)
 	return nil
 }

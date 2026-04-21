@@ -1,10 +1,13 @@
 package main
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/base32"
+	"errors"
 	"fmt"
 	"log"
+	"log/slog"
 	"net"
 	"net/http"
 	"os"
@@ -30,7 +33,7 @@ import (
 func runWrap(configPath string, args []string) int {
 	// Sync pricing
 	if err := runSync(configPath); err != nil {
-		log.Printf("warning: pricing sync failed: %v", err)
+		slog.Warn("pricing sync failed", "err", err)
 	}
 
 	cfg, err := config.Load(configPath)
@@ -67,6 +70,8 @@ func runWrap(configPath string, args []string) int {
 		authToken = newSessionToken()
 	}
 	r := chi.NewRouter()
+	r.Use(proxy.RequestIDMiddleware)
+	r.Use(proxy.RecoverMiddleware)
 	r.Use(proxy.AuthMiddleware(authToken))
 	r.Use(proxy.HeaderExtractionMiddleware)
 	r.Post("/v1/chat/completions", h.ChatCompletions)
@@ -88,13 +93,17 @@ func runWrap(configPath string, args []string) int {
 	// Start proxy in background
 	server := &http.Server{Handler: r}
 	go func() {
-		if err := server.Serve(listener); err != http.ErrServerClosed {
-			log.Printf("proxy error: %v", err)
+		if err := server.Serve(listener); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			slog.Warn("proxy serve error", "err", err)
 		}
 	}()
 
-	// Wait for proxy to be ready
-	waitForReady(fmt.Sprintf("http://127.0.0.1:%d/health", port))
+	// Wait for proxy to be ready (bounded; fail hard if unreachable).
+	if err := waitForReady(fmt.Sprintf("http://127.0.0.1:%d/health", port)); err != nil {
+		fmt.Fprintf(os.Stderr, "frugal: proxy did not become ready: %v\n", err)
+		_ = server.Close()
+		return 1
+	}
 
 	fmt.Fprintf(os.Stderr, "frugal: proxy running on :%d → routing across %d models\n", port, len(registry.AllModels()))
 
@@ -107,46 +116,60 @@ func runWrap(configPath string, args []string) int {
 	cmd.Stderr = os.Stderr
 	cmd.Env = injectEnv(os.Environ(), baseURL, authToken)
 
-	// Forward signals to the child process
+	if err := cmd.Start(); err != nil {
+		fmt.Fprintf(os.Stderr, "frugal: failed to start command: %v\n", err)
+		_ = server.Close()
+		return 1
+	}
+
+	// Forward signals to the child. signal.Notify installed AFTER Start so
+	// signals never race a half-spawned process.
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
 	go func() {
 		for sig := range sigCh {
-			if cmd.Process != nil {
-				cmd.Process.Signal(sig)
+			if p := cmd.Process; p != nil {
+				_ = p.Signal(sig)
 			}
 		}
 	}()
 
 	exitCode := 0
-	if err := cmd.Run(); err != nil {
+	if err := cmd.Wait(); err != nil {
 		if exitErr, ok := err.(*exec.ExitError); ok {
 			exitCode = exitErr.ExitCode()
 		} else {
-			fmt.Fprintf(os.Stderr, "frugal: failed to run command: %v\n", err)
+			fmt.Fprintf(os.Stderr, "frugal: command exited with error: %v\n", err)
 			exitCode = 1
 		}
 	}
+	signal.Stop(sigCh)
+	close(sigCh)
 
-	// Shut down proxy
-	server.Close()
+	// Drain in-flight proxy requests before the wrapped command's exit code
+	// propagates back to the caller.
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if err := server.Shutdown(shutdownCtx); err != nil {
+		slog.Warn("proxy shutdown returned error", "err", err)
+	}
 	return exitCode
 }
 
 func registerProviders(cfg *config.Config, registry *provider.Registry) {
 	if pc, ok := cfg.Providers["openai"]; ok {
 		if key := os.Getenv(pc.APIKeyEnv); key != "" {
-			registry.Register(provopenai.New(key, pc.BaseURL, modelNames(pc)))
+			registry.Register(provider.WithRetry(provopenai.New(key, pc.BaseURL, modelNames(pc))))
 		}
 	}
 	if pc, ok := cfg.Providers["anthropic"]; ok {
 		if key := os.Getenv(pc.APIKeyEnv); key != "" {
-			registry.Register(provanthropic.New(key, pc.BaseURL, modelNames(pc)))
+			registry.Register(provider.WithRetry(provanthropic.New(key, pc.BaseURL, modelNames(pc))))
 		}
 	}
 	if pc, ok := cfg.Providers["google"]; ok {
 		if key := os.Getenv(pc.APIKeyEnv); key != "" {
-			registry.Register(provgoogle.New(key, pc.BaseURL, modelNames(pc)))
+			registry.Register(provider.WithRetry(provgoogle.New(key, pc.BaseURL, modelNames(pc))))
 		}
 	}
 }
@@ -168,8 +191,8 @@ func injectEnv(environ []string, baseURL, authToken string) []string {
 func newSessionToken() string {
 	var buf [16]byte
 	if _, err := rand.Read(buf[:]); err != nil {
-		// crypto/rand failure is unrecoverable; die rather than silently
-		// downgrade to a weak token.
+		// crypto/rand failure is unrecoverable; log.Fatalf still works here
+		// because obs is initialised before runWrap.
 		log.Fatalf("frugal: failed to generate session token: %v", err)
 	}
 	return "frugal-" + base32.StdEncoding.WithPadding(base32.NoPadding).EncodeToString(buf[:])
@@ -186,13 +209,22 @@ func upsertEnv(environ []string, key, value string) []string {
 	return append(environ, prefix+value)
 }
 
-func waitForReady(url string) {
-	for i := 0; i < 50; i++ {
-		resp, err := http.Get(url)
+// waitForReady polls the proxy /health endpoint with a tight per-call timeout.
+// A misconfigured HTTP proxy env var or bad DNS would otherwise stall on the
+// default client's 30s-plus timeout; cap the overall wait at ~2s so we fail
+// fast and the wrapped command never inherits a half-started proxy.
+func waitForReady(url string) error {
+	client := &http.Client{Timeout: 50 * time.Millisecond}
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) {
+		resp, err := client.Get(url)
 		if err == nil {
-			resp.Body.Close()
-			return
+			_ = resp.Body.Close()
+			if resp.StatusCode == http.StatusOK {
+				return nil
+			}
 		}
-		time.Sleep(10 * time.Millisecond)
+		time.Sleep(20 * time.Millisecond)
 	}
+	return fmt.Errorf("proxy did not become ready within 2s")
 }

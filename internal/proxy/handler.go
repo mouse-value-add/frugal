@@ -1,11 +1,11 @@
 package proxy
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"os"
 	"strconv"
@@ -14,6 +14,8 @@ import (
 	"time"
 
 	"github.com/frugalsh/frugal/internal/classifier"
+	"github.com/frugalsh/frugal/internal/metrics"
+	"github.com/frugalsh/frugal/internal/obs"
 	"github.com/frugalsh/frugal/internal/provider"
 	"github.com/frugalsh/frugal/internal/router"
 	"github.com/frugalsh/frugal/internal/types"
@@ -38,26 +40,71 @@ var maxCostPerRequestUSD = func() float64 {
 	return v
 }()
 
+const defaultDecisionBufferSize = 1000
+
 // Handler serves the OpenAI-compatible API endpoints.
 type Handler struct {
 	classifier classifier.Classifier
 	router     *router.Router
 	registry   *provider.Registry
 
-	// Ring buffer of recent routing decisions for /v1/routing/explain
-	mu             sync.Mutex
-	decisions      []types.RoutingDecision
-	decisionIdx    int
-	lastDecision   *types.RoutingDecision
+	// Decision storage: the hot path posts to decisionCh (non-blocking send
+	// with a drop-on-full policy so a slow /routing/explain consumer never
+	// back-pressures chat requests). A single background goroutine drains
+	// the channel into the ring buffer under mu.
+	decisionCh   chan types.RoutingDecision
+	mu           sync.Mutex
+	decisions    []types.RoutingDecision
+	decisionIdx  int
+	lastDecision *types.RoutingDecision
 }
 
 func NewHandler(cls classifier.Classifier, rtr *router.Router, reg *provider.Registry) *Handler {
-	return &Handler{
+	size := envIntOrDefault("FRUGAL_DECISION_BUFFER", defaultDecisionBufferSize)
+	if size <= 0 {
+		size = defaultDecisionBufferSize
+	}
+	h := &Handler{
 		classifier: cls,
 		router:     rtr,
 		registry:   reg,
+		decisionCh: make(chan types.RoutingDecision, size),
 		decisions:  make([]types.RoutingDecision, 100),
 	}
+	go h.drainDecisions()
+	return h
+}
+
+// drainDecisions runs for the life of the handler, pumping decisions from the
+// hot-path channel into the ring buffer. Runs on a single goroutine so the
+// mutex never contends with request handling.
+func (h *Handler) drainDecisions() {
+	for d := range h.decisionCh {
+		h.mu.Lock()
+		h.decisions[h.decisionIdx%len(h.decisions)] = d
+		h.decisionIdx++
+		last := d
+		h.lastDecision = &last
+		h.mu.Unlock()
+	}
+}
+
+// envIntOrDefault mirrors the CLI helper so the package is self-contained.
+// Duplicated here rather than exported because the CLI version logs via slog
+// which would introduce a cycle if imported.
+func envIntOrDefault(key string, fallback int) int {
+	if s, ok := lookupEnv(key); ok {
+		if v, err := strconv.Atoi(s); err == nil && v > 0 {
+			return v
+		}
+	}
+	return fallback
+}
+
+// lookupEnv is a tiny shim so tests can stub os.Getenv without a global.
+var lookupEnv = func(key string) (string, bool) {
+	v, ok := os.LookupEnv(key)
+	return v, ok
 }
 
 // allowedFallbackModels returns a set of registered model names for
@@ -71,12 +118,15 @@ func (h *Handler) allowedFallbackModels() map[string]struct{} {
 	return set
 }
 
+// recordDecision enqueues d for the background drain. The send is
+// non-blocking: a slow drain or a packed channel drops the decision rather
+// than stalling the hot path, which is the right trade-off — losing an
+// observability point is cheaper than losing request latency.
 func (h *Handler) recordDecision(d types.RoutingDecision) {
-	h.mu.Lock()
-	defer h.mu.Unlock()
-	h.decisions[h.decisionIdx%len(h.decisions)] = d
-	h.decisionIdx++
-	h.lastDecision = &d
+	select {
+	case h.decisionCh <- d:
+	default:
+	}
 }
 
 const maxChatCompletionsBodyBytes int64 = 1 << 20 // 1 MiB
@@ -131,8 +181,11 @@ func (h *Handler) ChatCompletions(w http.ResponseWriter, r *http.Request) {
 	// what they asked for) and when the cap is disabled. The router already
 	// records decision.EstimatedCost, so this is effectively free.
 	if !decision.Pinned && maxCostPerRequestUSD > 0 && decision.EstimatedCost > maxCostPerRequestUSD {
-		log.Printf("rejecting request: estimated cost $%.4f exceeds cap $%.2f (model=%s)",
-			decision.EstimatedCost, maxCostPerRequestUSD, decision.SelectedModel)
+		obs.L(r.Context()).Warn("rejecting request over cost cap",
+			"estimated_cost_usd", decision.EstimatedCost,
+			"cap_usd", maxCostPerRequestUSD,
+			"model", decision.SelectedModel,
+		)
 		writeError(w, http.StatusPaymentRequired, "estimated request cost exceeds configured cap")
 		return
 	}
@@ -142,11 +195,28 @@ func (h *Handler) ChatCompletions(w http.ResponseWriter, r *http.Request) {
 	// Add routing info header
 	w.Header().Set("X-Frugal-Model", decision.SelectedModel)
 	w.Header().Set("X-Frugal-Provider", decision.SelectedProvider)
+	if decision.RelaxedFrom != "" {
+		w.Header().Set("X-Frugal-Relaxed-From", decision.RelaxedFrom)
+		metrics.RoutingRelaxedTotal.WithLabelValues(decision.RelaxedFrom, decision.Quality).Inc()
+	}
 
+	start := time.Now()
+	streamLabel := "nonstream"
 	if req.Stream {
-		h.handleStream(w, r, prov, decision, req, fallbacks)
+		streamLabel = "stream"
+	}
+	sw := &statusWriter{ResponseWriter: w, status: http.StatusOK}
+	if req.Stream {
+		h.handleStream(sw, r, prov, decision, req, fallbacks)
 	} else {
-		h.handleNonStream(w, r, prov, decision, req, fallbacks)
+		h.handleNonStream(sw, r, prov, decision, req, fallbacks)
+	}
+	metrics.RequestsTotal.WithLabelValues(
+		decision.SelectedModel, decision.SelectedProvider, decision.Quality, metrics.StatusClass(sw.status),
+	).Inc()
+	metrics.ObserveDuration(metrics.RequestDurationSeconds, decision.SelectedModel, decision.SelectedProvider, streamLabel, time.Since(start))
+	if decision.EstimatedCost > 0 {
+		metrics.CostUSDTotal.WithLabelValues(decision.SelectedModel, decision.SelectedProvider).Add(decision.EstimatedCost)
 	}
 }
 
@@ -196,10 +266,10 @@ func (h *Handler) handleNonStream(w http.ResponseWriter, r *http.Request, prov p
 			if err == nil {
 				break
 			}
-			log.Printf("fallback %s failed: %v", fb, err)
+			obs.L(r.Context()).Warn("fallback failed", "model", fb, "err", err)
 		}
 		if err != nil {
-			log.Printf("upstream error on %s: %v", decision.SelectedModel, err)
+			obs.L(r.Context()).Error("upstream error", "model", decision.SelectedModel, "err", err)
 			writeError(w, http.StatusBadGateway, sanitizedUpstreamMessage(err))
 			return
 		}
@@ -233,29 +303,56 @@ func sanitizedUpstreamMessage(err error) string {
 }
 
 func (h *Handler) handleStream(w http.ResponseWriter, r *http.Request, prov provider.Provider, decision types.RoutingDecision, req *types.ChatCompletionRequest, fallbacks []string) {
-	ch, err := prov.ChatCompletionStream(r.Context(), decision.SelectedModel, req)
+	ch, first, err := openStreamWithFirstChunk(r.Context(), prov, decision.SelectedModel, req)
 	if err != nil {
-		// Try fallback chain
+		// Handshake or first-chunk failure: walk the fallback chain. Once the
+		// first chunk has been written to the client, any further error is
+		// surfaced in-band (see streaming.go) — retry is no longer safe.
 		for _, fb := range boundedFallbacks(fallbacks, decision.SelectedModel, h.allowedFallbackModels()) {
 			fbProv, fbErr := h.registry.Resolve(fb)
 			if fbErr != nil {
 				continue
 			}
-			ch, err = fbProv.ChatCompletionStream(r.Context(), fb, req)
+			ch, first, err = openStreamWithFirstChunk(r.Context(), fbProv, fb, req)
 			if err == nil {
 				break
 			}
-			log.Printf("fallback stream %s failed: %v", fb, err)
+			obs.L(r.Context()).Warn("fallback stream failed", "model", fb, "err", err)
 		}
 		if err != nil {
-			log.Printf("upstream stream error on %s: %v", decision.SelectedModel, err)
+			obs.L(r.Context()).Error("upstream stream error", "model", decision.SelectedModel, "err", err)
 			writeError(w, http.StatusBadGateway, sanitizedUpstreamMessage(err))
 			return
 		}
 	}
 
-	if err := streamResponse(w, ch); err != nil {
-		log.Printf("stream error: %v", err)
+	if err := streamResponseWithFirst(r.Context(), w, first, ch); err != nil {
+		obs.L(r.Context()).Warn("stream write error", "err", err)
+	}
+}
+
+// openStreamWithFirstChunk opens an upstream stream AND reads the first chunk
+// synchronously so handshake-success-but-immediate-Err is still handled by
+// the fallback chain. If the first chunk carries a Done (empty stream) that's
+// still considered a success so the DONE terminator reaches the client.
+func openStreamWithFirstChunk(ctx context.Context, prov provider.Provider, model string, req *types.ChatCompletionRequest) (<-chan provider.StreamChunk, *provider.StreamChunk, error) {
+	ch, err := prov.ChatCompletionStream(ctx, model, req)
+	if err != nil {
+		return nil, nil, err
+	}
+	select {
+	case first, ok := <-ch:
+		if !ok {
+			// Upstream closed the channel without emitting anything.
+			// Treat as handshake failure so fallback runs.
+			return nil, nil, fmt.Errorf("upstream closed stream before first chunk")
+		}
+		if first.Err != nil {
+			return nil, nil, first.Err
+		}
+		return ch, &first, nil
+	case <-ctx.Done():
+		return nil, nil, ctx.Err()
 	}
 }
 
@@ -293,7 +390,7 @@ func boundedFallbacks(fallbacks []string, selectedModel string, allowed map[stri
 
 		if allowed != nil {
 			if _, ok := allowed[trimmed]; !ok {
-				log.Printf("ignoring fallback %q: not a registered model", trimmed)
+				obs.L(nil).Warn("ignoring unregistered fallback", "model", trimmed)
 				continue
 			}
 		}

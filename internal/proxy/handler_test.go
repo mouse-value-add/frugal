@@ -301,6 +301,63 @@ func TestChatCompletions_RejectsOversizedBody(t *testing.T) {
 	}
 }
 
+func TestChatCompletions_RelaxedFromHeader_EmittedWhenDowngraded(t *testing.T) {
+	// Force a downgrade: no model clears the "high" threshold for a simple
+	// English prompt (both mock models have reasoning below the high bar
+	// of 0.88 on non-coding/non-math queries, except mock-premium at 0.95).
+	// The premium model does clear it, so we instead construct a setup that
+	// cannot clear high but can clear balanced.
+	reg := newStubMockRegistry()
+	models := []router.ModelEntry{
+		{
+			Name: "cheap", Provider: "mock",
+			CostPer1KInput: 0.001, CostPer1KOutput: 0.002,
+			Reasoning: 0.70, Coding: 0.70, Creative: 0.70, InstructFollowing: 0.70,
+			ToolUse: true, JSONMode: true, MaxContext: 100000,
+		},
+	}
+	thresholds := map[string]router.Threshold{
+		"high":     {MinReasoning: 0.99, MinCoding: 0.99, MinCreative: 0.99, MinInstructFollowing: 0.99},
+		"balanced": {MinReasoning: 0.60, MinCoding: 0.60, MinCreative: 0.60, MinInstructFollowing: 0.60},
+		"cost":     {},
+	}
+	cls := classifier.NewRuleBased()
+	rtr := router.New(models, thresholds)
+	h := NewHandler(cls, rtr, reg)
+
+	mux := http.NewServeMux()
+	mux.HandleFunc("POST /v1/chat/completions", h.ChatCompletions)
+	ts := httptest.NewServer(HeaderExtractionMiddleware(mux))
+	defer ts.Close()
+
+	body, _ := json.Marshal(types.ChatCompletionRequest{
+		Model:    "auto",
+		Messages: []types.Message{{Role: "user", Content: mustMarshalJSON("Hello")}},
+	})
+	req, _ := http.NewRequest("POST", ts.URL+"/v1/chat/completions", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-Frugal-Quality", "high")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if got := resp.Header.Get("X-Frugal-Relaxed-From"); got != "high" {
+		t.Fatalf("expected X-Frugal-Relaxed-From=high, got %q", got)
+	}
+}
+
+// newStubMockRegistry returns a registry with a single mock model used when
+// the default setupHandler wiring is too opinionated for a specific test.
+func newStubMockRegistry() *provider.Registry {
+	reg := provider.NewRegistry()
+	mock := &mockProvider{name: "mock", models: []string{"cheap"}}
+	reg.Register(mock)
+	return reg
+}
+
 func TestChatCompletions_MultimodalContent_IsAccepted(t *testing.T) {
 	// Router accepts array-typed Content and forwards the request. The
 	// classifier must still see a meaningful text feature via ContentText;
