@@ -30,7 +30,7 @@ func extractFeatures(req *types.ChatCompletionRequest) types.QueryFeatures {
 	for _, msg := range req.Messages {
 		if msg.Role == "system" {
 			f.HasSystemPrompt = true
-			f.SystemPromptLength = len(msg.ContentString())
+			f.SystemPromptLength = len(msg.ContentText())
 			break
 		}
 	}
@@ -50,6 +50,15 @@ func extractFeatures(req *types.ChatCompletionRequest) types.QueryFeatures {
 	f.RequiresJSON = req.ResponseFormat != nil && req.ResponseFormat.Type == "json_object"
 	f.RequiresToolUse = len(req.Tools) > 0
 
+	// Vision: any message carrying non-text content (image_url, input_audio)
+	// forces the router to only consider vision-capable models.
+	for _, msg := range req.Messages {
+		if msg.HasNonTextContent() {
+			f.RequiresVision = true
+			break
+		}
+	}
+
 	// Domain hints
 	f.DomainHints = detectDomains(allText)
 
@@ -62,7 +71,7 @@ func extractFeatures(req *types.ChatCompletionRequest) types.QueryFeatures {
 func concatenateMessages(msgs []types.Message) string {
 	var b strings.Builder
 	for _, m := range msgs {
-		b.WriteString(m.ContentString())
+		b.WriteString(m.ContentText())
 		b.WriteByte(' ')
 	}
 	return b.String()
@@ -75,7 +84,7 @@ func estimateOutputTokens(req *types.ChatCompletionRequest) int {
 	// Default estimate based on input size
 	inputChars := 0
 	for _, m := range req.Messages {
-		inputChars += len(m.ContentString())
+		inputChars += len(m.ContentText())
 	}
 	est := inputChars / 4 // rough: output ~= input length
 	if est < 100 {

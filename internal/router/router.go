@@ -94,6 +94,9 @@ func (r *Router) meetsRequirements(m ModelEntry, f types.QueryFeatures, t Thresh
 	if f.RequiresJSON && !m.JSONMode {
 		return false
 	}
+	if f.RequiresVision && !m.Vision {
+		return false
+	}
 	if f.EstimatedInputTokens > m.MaxContext {
 		return false
 	}
@@ -112,6 +115,9 @@ func (r *Router) filterHardRequirements(f types.QueryFeatures) []ModelEntry {
 			continue
 		}
 		if f.RequiresJSON && !m.JSONMode {
+			continue
+		}
+		if f.RequiresVision && !m.Vision {
 			continue
 		}
 		if f.EstimatedInputTokens > m.MaxContext {

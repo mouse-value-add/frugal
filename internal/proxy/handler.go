@@ -114,8 +114,11 @@ func decodeChatCompletionRequest(w http.ResponseWriter, r *http.Request) (*types
 	r.Body = http.MaxBytesReader(w, r.Body, maxChatCompletionsBodyBytes)
 	defer r.Body.Close()
 
+	// Unknown fields are accepted and forwarded to the OpenAI provider verbatim.
+	// Real OpenAI SDKs routinely send fields the proxy would otherwise reject
+	// (parallel_tool_calls, seed, reasoning_effort, service_tier, etc.), which
+	// would break Frugal's "no code changes" promise.
 	dec := json.NewDecoder(r.Body)
-	dec.DisallowUnknownFields()
 
 	var req types.ChatCompletionRequest
 	if err := dec.Decode(&req); err != nil {

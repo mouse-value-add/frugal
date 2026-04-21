@@ -34,6 +34,7 @@ type QueryFeatures struct {
 	ConversationTurns     int      `json:"conversation_turns"`
 	RequiresJSON          bool     `json:"requires_json"`
 	RequiresToolUse       bool     `json:"requires_tool_use"`
+	RequiresVision        bool     `json:"requires_vision"`
 	DomainHints           []string `json:"domain_hints"`
 	ComplexityScore       float64  `json:"complexity_score"` // 0.0 - 1.0
 }

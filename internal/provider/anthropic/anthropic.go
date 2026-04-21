@@ -61,8 +61,24 @@ type messagesRequest struct {
 }
 
 type anthropicMsg struct {
-	Role    string `json:"role"`
-	Content string `json:"content"`
+	Role    string              `json:"role"`
+	Content []anthropicContent  `json:"content"`
+}
+
+// anthropicContent is Anthropic's content block. We emit only the block types
+// used by Frugal today: text and image. Tool-result/tool-use passthrough is
+// handled in Phase 4.
+type anthropicContent struct {
+	Type   string           `json:"type"`
+	Text   string           `json:"text,omitempty"`
+	Source *anthropicSource `json:"source,omitempty"`
+}
+
+type anthropicSource struct {
+	Type      string `json:"type"`                 // "base64" or "url"
+	MediaType string `json:"media_type,omitempty"` // required for base64
+	Data      string `json:"data,omitempty"`       // base64 payload
+	URL       string `json:"url,omitempty"`        // for type:"url"
 }
 
 type anthropicTool struct {
@@ -119,21 +135,23 @@ func translateRequest(req *types.ChatCompletionRequest, model string) *messagesR
 	maxTokens := 4096
 	if req.MaxTokens != nil {
 		maxTokens = *req.MaxTokens
+	} else if req.MaxCompletionTokens != nil {
+		maxTokens = *req.MaxCompletionTokens
 	}
 	ar.MaxTokens = maxTokens
 
 	for _, msg := range req.Messages {
 		if msg.Role == "system" {
-			ar.System = msg.ContentString()
+			ar.System = msg.ContentText()
 			continue
 		}
 		role := msg.Role
 		if role == "tool" {
-			role = "user" // Anthropic handles tool results differently, simplify for now
+			role = "user" // tool_result block mapping lands in Phase 4
 		}
 		ar.Messages = append(ar.Messages, anthropicMsg{
 			Role:    role,
-			Content: msg.ContentString(),
+			Content: toAnthropicContent(msg),
 		})
 	}
 
@@ -146,6 +164,56 @@ func translateRequest(req *types.ChatCompletionRequest, model string) *messagesR
 	}
 
 	return ar
+}
+
+// toAnthropicContent translates an OpenAI message into Anthropic's content
+// block array. Text parts become {type:"text"}; image_url parts become
+// {type:"image"} with either a base64 or url source depending on the input.
+func toAnthropicContent(msg types.Message) []anthropicContent {
+	parts := msg.ContentParts()
+	if len(parts) == 0 {
+		return []anthropicContent{{Type: "text", Text: ""}}
+	}
+	out := make([]anthropicContent, 0, len(parts))
+	for _, p := range parts {
+		switch p.Type {
+		case "", "text":
+			out = append(out, anthropicContent{Type: "text", Text: p.Text})
+		case "image_url":
+			if p.ImageURL == nil {
+				continue
+			}
+			src := imageURLToAnthropicSource(p.ImageURL.URL)
+			if src == nil {
+				continue
+			}
+			out = append(out, anthropicContent{Type: "image", Source: src})
+		}
+	}
+	if len(out) == 0 {
+		out = append(out, anthropicContent{Type: "text", Text: ""})
+	}
+	return out
+}
+
+func imageURLToAnthropicSource(url string) *anthropicSource {
+	const dataPrefix = "data:"
+	if strings.HasPrefix(url, dataPrefix) {
+		// data:image/png;base64,<payload>
+		rest := url[len(dataPrefix):]
+		semi := strings.Index(rest, ";")
+		comma := strings.Index(rest, ",")
+		if semi < 0 || comma < 0 || semi > comma {
+			return nil
+		}
+		media := rest[:semi]
+		data := rest[comma+1:]
+		return &anthropicSource{Type: "base64", MediaType: media, Data: data}
+	}
+	if strings.HasPrefix(url, "http://") || strings.HasPrefix(url, "https://") {
+		return &anthropicSource{Type: "url", URL: url}
+	}
+	return nil
 }
 
 func translateResponse(ar *messagesResponse) *types.ChatCompletionResponse {

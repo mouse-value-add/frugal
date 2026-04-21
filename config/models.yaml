@@ -13,6 +13,7 @@ providers:
                     instruction_following: 0.78
                     tool_use: true
                     json_mode: false
+                    vision: true
                     max_context: 189096
             claude-opus-4-20250918:
                 cost_per_1k_input: 0.005
@@ -24,6 +25,7 @@ providers:
                     instruction_following: 0.97
                     tool_use: true
                     json_mode: false
+                    vision: true
                     max_context: 200000
             claude-sonnet-4-20250514:
                 cost_per_1k_input: 0.003
@@ -35,6 +37,7 @@ providers:
                     instruction_following: 0.94
                     tool_use: true
                     json_mode: false
+                    vision: true
                     max_context: 200000
     google:
         api_key_env: GOOGLE_API_KEY
@@ -50,6 +53,7 @@ providers:
                     instruction_following: 0.72
                     tool_use: true
                     json_mode: true
+                    vision: true
                     max_context: 1048576
             gemini-2.5-flash:
                 cost_per_1k_input: 0.0003
@@ -61,6 +65,7 @@ providers:
                     instruction_following: 0.74
                     tool_use: true
                     json_mode: true
+                    vision: true
                     max_context: 1048576
             gemini-2.5-pro:
                 cost_per_1k_input: 0.00125
@@ -72,6 +77,7 @@ providers:
                     instruction_following: 0.88
                     tool_use: true
                     json_mode: true
+                    vision: true
                     max_context: 1048576
     openai:
         api_key_env: OPENAI_API_KEY
@@ -87,6 +93,7 @@ providers:
                     instruction_following: 0.95
                     tool_use: true
                     json_mode: true
+                    vision: true
                     max_context: 128000
             gpt-4o-mini:
                 cost_per_1k_input: 0.00015
@@ -98,6 +105,7 @@ providers:
                     instruction_following: 0.8
                     tool_use: true
                     json_mode: true
+                    vision: true
                     max_context: 128000
             gpt-4.1:
                 cost_per_1k_input: 0.002
@@ -109,6 +117,7 @@ providers:
                     instruction_following: 0.96
                     tool_use: true
                     json_mode: true
+                    vision: true
                     max_context: 1047576
             gpt-4.1-mini:
                 cost_per_1k_input: 0.0004
@@ -120,6 +129,7 @@ providers:
                     instruction_following: 0.82
                     tool_use: true
                     json_mode: true
+                    vision: true
                     max_context: 1047576
             gpt-4.1-nano:
                 cost_per_1k_input: 0.0001
@@ -131,6 +141,7 @@ providers:
                     instruction_following: 0.65
                     tool_use: true
                     json_mode: true
+                    vision: true
                     max_context: 1047576
 quality_thresholds:
     balanced:

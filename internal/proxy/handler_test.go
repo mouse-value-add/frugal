@@ -143,7 +143,7 @@ func setupHandler() (*Handler, *httptest.Server) {
 			Name: "mock-premium", Provider: "mock",
 			CostPer1KInput: 0.003, CostPer1KOutput: 0.015,
 			Reasoning: 0.95, Coding: 0.93, Creative: 0.90, InstructFollowing: 0.95,
-			ToolUse: true, JSONMode: true, MaxContext: 200000,
+			ToolUse: true, JSONMode: true, Vision: true, MaxContext: 200000,
 		},
 	}
 	thresholds := map[string]router.Threshold{
@@ -260,20 +260,23 @@ func TestChatCompletions_ModelPinning(t *testing.T) {
 	}
 }
 
-func TestChatCompletions_RejectsUnknownFields(t *testing.T) {
+func TestChatCompletions_AcceptsUnknownFields(t *testing.T) {
+	// Real OpenAI SDKs send fields Frugal does not explicitly model
+	// (parallel_tool_calls, seed, reasoning_effort, service_tier, etc.).
+	// The proxy must accept them so the "no code changes" promise holds.
 	_, ts := setupHandler()
 	defer ts.Close()
 
-	body := []byte(`{"model":"auto","messages":[{"role":"user","content":"hello"}],"unexpected":true}`)
+	body := []byte(`{"model":"auto","messages":[{"role":"user","content":"hello"}],"unexpected":true,"seed":42,"parallel_tool_calls":false}`)
 	resp, err := http.Post(ts.URL+"/v1/chat/completions", "application/json", bytes.NewReader(body))
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusBadRequest {
+	if resp.StatusCode != http.StatusOK {
 		b, _ := io.ReadAll(resp.Body)
-		t.Fatalf("expected 400, got %d: %s", resp.StatusCode, string(b))
+		t.Fatalf("expected 200, got %d: %s", resp.StatusCode, string(b))
 	}
 }
 
@@ -295,6 +298,29 @@ func TestChatCompletions_RejectsOversizedBody(t *testing.T) {
 	if resp.StatusCode != http.StatusBadRequest {
 		b, _ := io.ReadAll(resp.Body)
 		t.Fatalf("expected 400, got %d: %s", resp.StatusCode, string(b))
+	}
+}
+
+func TestChatCompletions_MultimodalContent_IsAccepted(t *testing.T) {
+	// Router accepts array-typed Content and forwards the request. The
+	// classifier must still see a meaningful text feature via ContentText;
+	// the provider must still be invoked.
+	_, ts := setupHandler()
+	defer ts.Close()
+
+	body := []byte(`{"model":"auto","messages":[{"role":"user","content":[
+		{"type":"text","text":"what is in this picture"},
+		{"type":"image_url","image_url":{"url":"data:image/png;base64,AAAA"}}
+	]}]}`)
+	resp, err := http.Post(ts.URL+"/v1/chat/completions", "application/json", bytes.NewReader(body))
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		b, _ := io.ReadAll(resp.Body)
+		t.Fatalf("expected 200 for multimodal request, got %d: %s", resp.StatusCode, string(b))
 	}
 }
 

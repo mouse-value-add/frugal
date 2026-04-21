@@ -1,10 +1,11 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"os"
-	"strings"
+	"path/filepath"
 
 	"github.com/frugalsh/frugal/internal/config"
 	msync "github.com/frugalsh/frugal/internal/sync"
@@ -24,7 +25,7 @@ var modelAliases = map[string][]string{
 func runSync(configPath string) error {
 	log.Println("fetching model pricing from models.dev...")
 
-	catalog, err := msync.FetchModels()
+	catalog, err := msync.FetchModels(context.Background())
 	if err != nil {
 		return fmt.Errorf("fetch failed: %w", err)
 	}
@@ -101,6 +102,10 @@ func runSync(configPath string) error {
 	return nil
 }
 
+// lookupModel resolves a configured model to a models.dev catalog entry by
+// exact key or explicit alias. Fuzzy (strings.Contains) matching is
+// intentionally absent: it silently cross-bound prices (e.g. gpt-4 → gpt-4o)
+// because the map iteration is unordered.
 func lookupModel(catalog map[string]msync.ModelsDevEntry, providerName, modelName string) (msync.ModelsDevEntry, bool) {
 	// 1. Try "provider/model" (e.g., "openai/gpt-4o")
 	if entry, ok := catalog[providerName+"/"+modelName]; ok {
@@ -118,35 +123,53 @@ func lookupModel(catalog map[string]msync.ModelsDevEntry, providerName, modelNam
 			if entry, ok := catalog[alias]; ok {
 				return entry, true
 			}
-			// Also try with provider prefix
 			if entry, ok := catalog[providerName+"/"+alias]; ok {
 				return entry, true
 			}
 		}
 	}
 
-	// 4. Fuzzy: find catalog entry containing the model name or vice versa
-	for id, entry := range catalog {
-		bare := id
-		if idx := strings.LastIndex(id, "/"); idx >= 0 {
-			bare = id[idx+1:]
-		}
-		if strings.Contains(bare, modelName) || strings.Contains(modelName, bare) {
-			return entry, true
-		}
-	}
-
 	return msync.ModelsDevEntry{}, false
 }
 
+// writeConfig atomically replaces the config file: write to a sibling
+// tempfile, fsync, then rename. An interrupted sync never leaves the user's
+// models.yaml truncated or partially written.
 func writeConfig(path string, cfg *config.Config) error {
 	data, err := yaml.Marshal(cfg)
 	if err != nil {
 		return fmt.Errorf("marshal config: %w", err)
 	}
 
-	if err := os.WriteFile(path, data, 0644); err != nil {
-		return fmt.Errorf("write config: %w", err)
+	dir := filepath.Dir(path)
+	tmp, err := os.CreateTemp(dir, filepath.Base(path)+".tmp-*")
+	if err != nil {
+		return fmt.Errorf("create tempfile: %w", err)
+	}
+	tmpPath := tmp.Name()
+	cleanup := func() { _ = os.Remove(tmpPath) }
+
+	if _, err := tmp.Write(data); err != nil {
+		tmp.Close()
+		cleanup()
+		return fmt.Errorf("write tempfile: %w", err)
+	}
+	if err := tmp.Sync(); err != nil {
+		tmp.Close()
+		cleanup()
+		return fmt.Errorf("fsync tempfile: %w", err)
+	}
+	if err := tmp.Close(); err != nil {
+		cleanup()
+		return fmt.Errorf("close tempfile: %w", err)
+	}
+	if err := os.Chmod(tmpPath, 0644); err != nil {
+		cleanup()
+		return fmt.Errorf("chmod tempfile: %w", err)
+	}
+	if err := os.Rename(tmpPath, path); err != nil {
+		cleanup()
+		return fmt.Errorf("rename tempfile: %w", err)
 	}
 
 	log.Printf("wrote updated config to %s", path)

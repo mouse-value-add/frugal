@@ -32,6 +32,7 @@ type CapabilityConfig struct {
 	InstructionFollowing float64 `yaml:"instruction_following"`
 	ToolUse              bool    `yaml:"tool_use"`
 	JSONMode             bool    `yaml:"json_mode"`
+	Vision               bool    `yaml:"vision"`
 	MaxContext           int     `yaml:"max_context"`
 }
 
