@@ -3,21 +3,21 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>frugal — route every LLM call to the cheapest model that won't compromise quality</title>
-  <meta name="description" content="Open-source LLM proxy. Routes every request to the cheapest model that won't compromise quality. No account. No code changes. One command." />
+  <title>frugal — route every AI use case to the cheapest model + toolchain bundle</title>
+  <meta name="description" content="Open-source AI toolchain cost optimizer. Routes each use case to the cheapest (model + toolchain) bundle that clears the quality bar — chat, web search, reranking, content extraction, browser. No account. No code changes. One command." />
   <meta name="theme-color" content="#0a0a0b" media="(prefers-color-scheme: dark)" />
   <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)" />
   <meta name="color-scheme" content="dark light" />
 
   <meta property="og:type" content="website" />
   <meta property="og:url" content="https://frugal.sh/" />
-  <meta property="og:title" content="frugal — drop your LLM bill 40–70%" />
-  <meta property="og:description" content="Open-source LLM proxy that routes every request to the cheapest model that won't compromise quality. No account. No code changes. One command." />
+  <meta property="og:title" content="frugal — drop your AI bill 40–70%" />
+  <meta property="og:description" content="Open-source AI toolchain cost optimizer that routes each use case to the cheapest (model + toolchain) bundle that clears the quality bar. No account. No code changes. One command." />
   <meta property="og:site_name" content="frugal.sh" />
 
   <meta name="twitter:card" content="summary_large_image" />
-  <meta name="twitter:title" content="frugal — drop your LLM bill 40–70%" />
-  <meta name="twitter:description" content="Open-source LLM proxy. No account. No code changes. One command." />
+  <meta name="twitter:title" content="frugal — drop your AI bill 40–70%" />
+  <meta name="twitter:description" content="Open-source AI toolchain cost optimizer. No account. No code changes. One command." />
 
   <link rel="canonical" href="https://frugal.sh/" />
   <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
@@ -41,15 +41,17 @@
 
   <main id="main">
     <section class="hero">
-      <p class="eyebrow" aria-hidden="true">open-source · MIT-adjacent · zero-config</p>
+      <p class="eyebrow" aria-hidden="true">open-source · AI toolchain cost optimizer · zero-config</p>
       <h1>
-        Route every LLM call to the <span class="accent">cheapest model</span>
-        that won't compromise quality.
+        Route every AI use case to the <span class="accent">cheapest model&nbsp;+&nbsp;toolchain</span>
+        bundle that won't compromise quality.
       </h1>
       <p class="lede">
-        Frugal wraps any command with a local OpenAI-compatible proxy, classifies each
-        request, and routes to the cheapest model that clears the quality bar.
-        No account. No code changes. One command.
+        A model alone isn't the product — the use case is. Legal research wants a strong model
+        <em>and</em> good web search. Code work wants Claude <em>and</em> code-aware retrieval.
+        Frugal wraps any command with a local OpenAI-compatible proxy, classifies each request
+        by use case, and routes to the cheapest (model + toolchain) bundle that clears the
+        quality bar. One proxy, one service. No account. No code changes. One command.
       </p>
 
       <div class="terminal" aria-label="Install command">
@@ -68,6 +70,14 @@
         <button class="copy" type="button" data-copy="frugal python my_app.py" aria-label="Copy example command">Copy</button>
       </div>
 
+      <div class="pills pills-caps" role="list" aria-label="Toolchain capabilities">
+        <span role="listitem">chat</span>
+        <span role="listitem">web search</span>
+        <span role="listitem">reranking</span>
+        <span role="listitem">content extraction</span>
+        <span role="listitem">browser</span>
+      </div>
+
       <div class="pills" role="list">
         <span role="listitem">No account</span>
         <span role="listitem">No code changes</span>
@@ -84,26 +94,30 @@
     <section class="why" aria-labelledby="why-heading">
       <h2 id="why-heading">The insight</h2>
       <p class="prose">
-        You're paying for capability you don't use on <strong>60–80% of your LLM calls.</strong>
-        A creative brainstorm doesn't need <code>o3</code>. A simple extraction doesn't need
-        <code>claude-opus</code>. Frugal classifies each request — complexity, domain,
-        capabilities required — and picks the cheapest model that clears the quality bar.
+        You're paying for capability you don't use on <strong>60–80% of your AI calls</strong> —
+        and when you <em>do</em> need capability, a bare chat model is rarely the answer.
+        Legal research needs a strong reasoner paired with good web search. A code-dev loop
+        needs Claude paired with code-aware retrieval. Structured extraction needs Haiku
+        with nothing else. Frugal classifies each request by <strong>use case</strong> and
+        routes to the cheapest (model&nbsp;+&nbsp;toolchain) bundle that clears the quality bar.
       </p>
       <dl class="grid">
         <div>
-          <dt>Classifier</dt>
-          <dd>Detects code, math, tool-use, JSON output, conversation depth, and domain.
-          Combines them into a complexity score, 0.0 – 1.0.</dd>
+          <dt>Use-case classifier</dt>
+          <dd>Detects the use case — research synthesis, code dev, factual Q&amp;A,
+          structured extraction, and more — plus the capabilities required
+          (chat, search, rerank, extract, browse).</dd>
         </div>
         <div>
-          <dt>Router</dt>
-          <dd>Per-quality-tier thresholds on reasoning, coding, creative, and
-          instruction-following. Cheapest model that clears all thresholds wins.</dd>
+          <dt>Bundle router</dt>
+          <dd>Per use case and quality tier, picks the cheapest
+          (model&nbsp;+&nbsp;toolchain) bundle that clears every threshold.
+          One proxy, one service, one routing decision.</dd>
         </div>
         <div>
-          <dt>Fallback</dt>
-          <dd>Routed model errors? Walk a caller-supplied chain or drop to a looser
-          quality tier. Bounded retries so latency stays predictable.</dd>
+          <dt>Eval as source of truth</dt>
+          <dd>Use-case benchmarks decide which bundles win. Routing isn't opinion —
+          it's what the data says wins for your workload, rerun on every release.</dd>
         </div>
       </dl>
     </section>
@@ -114,8 +128,9 @@
        │
        ├─ starts proxy on a free port
        ├─ injects OPENAI_BASE_URL into your command's environment
-       ├─ classifies each request (complexity, domain, capabilities)
-       ├─ routes to cheapest model that clears the quality bar
+       ├─ classifies each request (use case + required capabilities)
+       ├─ picks the cheapest (model + toolchain) bundle that clears the bar
+       ├─ calls bundled tools — web search, rerank, extract, browse — as needed
        └─ shuts down proxy when your command exits</pre>
     </section>
 
@@ -123,7 +138,10 @@
       <h2 id="compat-heading">Works with any OpenAI-compatible SDK</h2>
       <p class="prose">
         Frugal speaks the OpenAI chat-completions API. Point your existing SDK at the
-        proxy and nothing else changes.
+        proxy and nothing else changes. Toolchain capabilities — search, rerank,
+        extract, browse — are exposed on the same proxy under their own endpoints,
+        so your code stays in control and Frugal routes each capability to the
+        cheapest provider that clears the bar for your use case.
       </p>
       <div class="code-grid">
         <figure>
@@ -190,9 +208,13 @@ resp, _ := client.CreateChatCompletion(ctx, openai.ChatCompletionRequest{
     </section>
 
     <section class="providers" aria-labelledby="providers-heading">
-      <h2 id="providers-heading">Models routed today</h2>
-      <p class="prose">Pricing synced from <a href="https://models.dev" rel="noopener">models.dev</a> on every startup.
-      Add more by editing <code>~/.frugal/config/models.yaml</code>.</p>
+      <h2 id="providers-heading">What routes today</h2>
+      <p class="prose">Model pricing synced from <a href="https://models.dev" rel="noopener">models.dev</a> on every startup.
+      Extend by editing <code>~/.frugal/config/models.yaml</code>. Toolchain capabilities
+      roll out one at a time, each gated by the eval harness — web search and reranking
+      first, content extraction and browser next.</p>
+
+      <h3 class="provider-subhead">Model providers</h3>
       <div class="provider-grid">
         <div class="provider">
           <h3>OpenAI</h3>
@@ -205,6 +227,53 @@ resp, _ := client.CreateChatCompletion(ctx, openai.ChatCompletionRequest{
         <div class="provider">
           <h3>Google</h3>
           <p>Gemini 2.5 Pro · Gemini 2.5 Flash · Gemini 2.0 Flash</p>
+        </div>
+      </div>
+
+      <h3 class="provider-subhead">Toolchain capabilities</h3>
+      <div class="provider-grid">
+        <div class="provider">
+          <h3>Web search <span class="status-tag">shipping</span></h3>
+          <p>Route each search to the cheapest provider that clears recall &amp; freshness for the use case.</p>
+        </div>
+        <div class="provider">
+          <h3>Reranking <span class="status-tag">shipping</span></h3>
+          <p>Cross-encoder rerank of retrieved passages. Bundled with search for research-synthesis.</p>
+        </div>
+        <div class="provider">
+          <h3>Content extraction <span class="status-tag tag-next">next</span></h3>
+          <p>Clean text &amp; structured content from URLs. Bundled with search for factual Q&amp;A.</p>
+        </div>
+        <div class="provider">
+          <h3>Browser use <span class="status-tag tag-next">next</span></h3>
+          <p>Headless browsing for interactive sites. Bundled for use cases search can't reach.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="usecases" aria-labelledby="usecases-heading">
+      <h2 id="usecases-heading">Routed per use case</h2>
+      <p class="prose">
+        A use case is a named class of work. Each one ships with a labeled benchmark workload
+        and a curated bundle — the (capability → provider) map the eval says wins. Call
+        <code>/v1/bundles/{use-case}</code> to see what's picked and why.
+      </p>
+      <div class="provider-grid">
+        <div class="provider">
+          <h3>research-synthesis</h3>
+          <p>Chat + web search + rerank. Strong reasoner, broad recall, tight context.</p>
+        </div>
+        <div class="provider">
+          <h3>code-dev</h3>
+          <p>Chat with code-aware retrieval. Pairs a strong coder model with targeted search.</p>
+        </div>
+        <div class="provider">
+          <h3>factual-qa</h3>
+          <p>Chat + search + extraction. Cheapest model that holds grounding on the benchmark wins.</p>
+        </div>
+        <div class="provider">
+          <h3>structured-extraction</h3>
+          <p>Chat only, JSON-mode. No toolchain needed — the smallest model that passes the schema.</p>
         </div>
       </div>
     </section>
@@ -258,7 +327,7 @@ resp, _ := client.CreateChatCompletion(ctx, openai.ChatCompletionRequest{
           <dt>Observable by default</dt>
           <dd>Structured logs, <code>X-Request-ID</code> propagation, Prometheus
           <code>/metrics</code>, and <code>/v1/routing/explain</code> to see exactly
-          which model was picked and why.</dd>
+          which bundle was picked — model, toolchain, and why.</dd>
         </div>
         <div>
           <dt>Source-available, BUSL 1.1</dt>
