@@ -82,7 +82,12 @@ func runWrap(configPath string, args []string) int {
 	}()
 
 	// Wait for proxy to be ready
-	waitForReady(fmt.Sprintf("http://127.0.0.1:%d/health", port))
+	readyTimeout := envDurationOrDefault("FRUGAL_PROXY_READY_TIMEOUT", 3*time.Second)
+	if err := waitForReady(fmt.Sprintf("http://127.0.0.1:%d/health", port), readyTimeout); err != nil {
+		server.Close()
+		fmt.Fprintf(os.Stderr, "frugal: proxy failed readiness check: %v\n", err)
+		return 1
+	}
 
 	fmt.Fprintf(os.Stderr, "frugal: proxy running on :%d → routing across %d models\n", port, len(registry.AllModels()))
 
@@ -149,13 +154,22 @@ func injectEnv(environ []string, baseURL string) []string {
 	return out
 }
 
-func waitForReady(url string) {
-	for i := 0; i < 50; i++ {
+func waitForReady(url string, timeout time.Duration) error {
+	deadline := time.Now().Add(timeout)
+
+	for {
 		resp, err := http.Get(url)
 		if err == nil {
 			resp.Body.Close()
-			return
+			if resp.StatusCode >= 200 && resp.StatusCode < 300 {
+				return nil
+			}
 		}
-		time.Sleep(10 * time.Millisecond)
+
+		if time.Now().After(deadline) {
+			return fmt.Errorf("readiness check timed out after %s", timeout)
+		}
+
+		time.Sleep(25 * time.Millisecond)
 	}
 }
