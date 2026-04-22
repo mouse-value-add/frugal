@@ -3,8 +3,8 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>frugal — route every AI use case to the cheapest model + toolchain bundle</title>
-  <meta name="description" content="Open-source AI toolchain cost optimizer. Routes each use case to the cheapest (model + toolchain) bundle that clears the quality bar — chat, web search, reranking, content extraction, browser. No account. No code changes. One command." />
+  <title>frugal — route every prompt to the cheapest model + toolchain bundle</title>
+  <meta name="description" content="Open-source AI toolchain cost optimizer. Routes every prompt to the cheapest (model + toolchain) bundle that clears the quality bar — chat, web search, reranking, content extraction, browser. No account. No code changes. One command." />
   <meta name="theme-color" content="#0a0a0b" media="(prefers-color-scheme: dark)" />
   <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)" />
   <meta name="color-scheme" content="dark light" />
@@ -12,7 +12,7 @@
   <meta property="og:type" content="website" />
   <meta property="og:url" content="https://frugal.sh/" />
   <meta property="og:title" content="frugal — drop your AI bill 40–70%" />
-  <meta property="og:description" content="Open-source AI toolchain cost optimizer that routes each use case to the cheapest (model + toolchain) bundle that clears the quality bar. No account. No code changes. One command." />
+  <meta property="og:description" content="Open-source AI toolchain cost optimizer that routes every prompt to the cheapest (model + toolchain) bundle that clears the quality bar. No account. No code changes. One command." />
   <meta property="og:site_name" content="frugal.sh" />
 
   <meta name="twitter:card" content="summary_large_image" />
@@ -43,15 +43,14 @@
     <section class="hero">
       <p class="eyebrow" aria-hidden="true">open-source · AI toolchain cost optimizer · zero-config</p>
       <h1>
-        Route every AI use case to the <span class="accent">cheapest model&nbsp;+&nbsp;toolchain</span>
+        Route every prompt to the <span class="accent">cheapest model&nbsp;+&nbsp;toolchain</span>
         bundle that won't compromise quality.
       </h1>
       <p class="lede">
-        A model alone isn't the product — the use case is. Legal research wants a strong model
-        <em>and</em> good web search. Code work wants Claude <em>and</em> code-aware retrieval.
-        Frugal wraps any command with a local OpenAI-compatible proxy, classifies each request
-        by use case, and routes to the cheapest (model + toolchain) bundle that clears the
-        quality bar. One proxy, one service. No account. No code changes. One command.
+        You write a prompt. Frugal classifies it, picks the cheapest (model + toolchain)
+        bundle that clears the quality bar, and sends it there. Research, code, marketing,
+        extraction — whatever the job — every prompt gets routed through the same proxy.
+        No account. No code changes. One command.
       </p>
 
       <div class="terminal" aria-label="Install command">

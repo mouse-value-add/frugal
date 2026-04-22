@@ -150,8 +150,21 @@ h3 { font-size: 1.05rem; }
 }
 
 .hero h1 {
-  max-width: 20ch;
+  max-width: 24ch;
   margin-bottom: 20px;
+  font-size: clamp(1.1rem, 2vw, 1.5rem);
+  font-weight: 500;
+  color: var(--dim);
+  line-height: 1.35;
+  letter-spacing: -0.005em;
+}
+.hero h1 .accent {
+  display: block;
+  font-size: clamp(2.25rem, 5.5vw, 3.75rem);
+  font-weight: 700;
+  line-height: 1.05;
+  letter-spacing: -0.025em;
+  margin: 6px 0;
 }
 .accent { color: var(--accent); }
 
