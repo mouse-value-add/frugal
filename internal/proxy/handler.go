@@ -439,7 +439,7 @@ func boundedFallbacks(fallbacks []string, selectedModel string, allowed map[stri
 
 		if allowed != nil {
 			if _, ok := allowed[trimmed]; !ok {
-				obs.L(nil).Warn("ignoring unregistered fallback", "model", trimmed)
+				obs.L(context.TODO()).Warn("ignoring unregistered fallback", "model", trimmed)
 				continue
 			}
 		}

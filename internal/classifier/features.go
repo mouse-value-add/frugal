@@ -16,11 +16,6 @@ var (
 	mathKeywordRe = regexp.MustCompile(`(?i)\b(equation|derivative|integral|matrix|eigenvalue|polynomial|theorem|proof|calculus)\b`)
 )
 
-// largeInputTokenThreshold is the point at which RequiresLargeContext trips.
-// Chosen to fit comfortably below all in-tree models' context windows while
-// still excluding anything that won't accept 64k+ inputs.
-const largeInputTokenThreshold = 64 * 1024
-
 // perProviderCharsPerToken is a conservative divisor applied to the raw
 // character count when estimating input tokens. OpenAI BPE averages ~4 for
 // English text; Anthropic and Google tokenizers emit more fine-grained pieces,
