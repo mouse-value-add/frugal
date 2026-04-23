@@ -241,9 +241,20 @@ Common environment:
 See README.md for the full list.`)
 }
 
-// version reports a human-readable build identifier. Populated from the Go
-// module build info when available; falls back to "dev" during local builds.
+// buildVersion is injected at release time via
+//
+//	go build -ldflags "-X main.buildVersion=$VERSION"
+//
+// (see Makefile). It takes precedence over debug.ReadBuildInfo so release
+// binaries built with `go build` — not `go install` — still report a real
+// tag. Left empty for local `go run` / `go build` without ldflags.
+var buildVersion string
+
+// version reports a human-readable build identifier.
 func version() string {
+	if buildVersion != "" {
+		return buildVersion
+	}
 	if info, ok := debug.ReadBuildInfo(); ok {
 		if info.Main.Version != "" && info.Main.Version != "(devel)" {
 			return info.Main.Version

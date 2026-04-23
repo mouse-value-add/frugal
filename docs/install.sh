@@ -261,7 +261,11 @@ main() {
     # Every download goes through a tmpdir. The final binary lands in BIN_DIR
     # only after verification succeeds. If the script exits early, the tmpdir
     # is cleaned and BIN_DIR is never polluted with an untrusted binary.
-    local tmpdir
+    #
+    # NOTE: tmpdir is NOT declared `local` — the EXIT trap fires after main()
+    # returns, at which point a function-local would be out of scope and
+    # `set -u` would error on the unbound reference, making a successful
+    # install exit 1.
     tmpdir="$(mktemp -d)"
     trap 'rm -rf "$tmpdir"' EXIT
 
