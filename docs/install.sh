@@ -1,20 +1,49 @@
 #!/usr/bin/env bash
+#
+# frugal.sh installer
+# Usage:
+#   curl -fsSL https://frugal.sh/install | sh
+#   curl -fsSL https://frugal.sh/install | sh -s uninstall
+#
+# Env vars:
+#   FRUGAL_VERSION      Pin a specific release tag (e.g. v0.1.0). Default: latest.
+#   FRUGAL_INSTALL_DIR  Install root. Default: $HOME/.frugal
+#   FRUGAL_YES          Non-interactive. Skips the confirmation prompt.
+#
+# Exit codes:
+#   0  success
+#   2  unsupported platform
+#   3  network / upstream failure
+#   4  verification (checksum or signature) failed
+#   5  local state / user-aborted
+
 set -euo pipefail
 
-# frugal.sh installer
-# Usage: curl -fsSL https://frugal.sh/install | sh
+readonly EXIT_UNSUPPORTED=2
+readonly EXIT_NETWORK=3
+readonly EXIT_VERIFY=4
+readonly EXIT_LOCAL=5
 
-REPO="brainsparker/frugal"
-INSTALL_DIR="${FRUGAL_INSTALL_DIR:-$HOME/.frugal}"
-BIN_DIR="$INSTALL_DIR/bin"
-CONFIG_DIR="$INSTALL_DIR/config"
+readonly REPO="brainsparker/frugal"
+readonly PINNED_VERSION="${FRUGAL_VERSION:-}"
+readonly INSTALL_DIR="${FRUGAL_INSTALL_DIR:-$HOME/.frugal}"
+readonly BIN_DIR="$INSTALL_DIR/bin"
+readonly CONFIG_DIR="$INSTALL_DIR/config"
 
-# ---- helpers ----
+# Exact-match markers for the shell rc block. Uninstall deletes everything
+# between (and including) these lines. Do not change these strings without
+# considering existing users — the uninstall path depends on matching them.
+readonly RC_BEGIN="# >>> frugal.sh >>>"
+readonly RC_END="# <<< frugal.sh <<<"
 
-info()  { printf "\033[1;34m==>\033[0m %s\n" "$1"; }
-ok()    { printf "\033[1;32m ✓\033[0m  %s\n" "$1"; }
-warn()  { printf "\033[1;33m !\033[0m  %s\n" "$1"; }
-fail()  { printf "\033[1;31m ✗\033[0m  %s\n" "$1" >&2; exit 1; }
+# ---- UI ----
+
+info() { printf "\033[1;34m==>\033[0m %s\n" "$1"; }
+ok()   { printf "\033[1;32m ✓\033[0m  %s\n" "$1"; }
+warn() { printf "\033[1;33m !\033[0m  %s\n" "$1"; }
+fail() { printf "\033[1;31m ✗\033[0m  %s\n" "$1" >&2; exit "${2:-1}"; }
+
+# ---- Platform detection ----
 
 detect_platform() {
     local os arch
@@ -22,196 +51,298 @@ detect_platform() {
     arch="$(uname -m)"
 
     case "$arch" in
-        x86_64|amd64) arch="amd64" ;;
+        x86_64|amd64)  arch="amd64" ;;
         arm64|aarch64) arch="arm64" ;;
-        *) fail "unsupported architecture: $arch" ;;
+        *) fail "unsupported architecture: $arch" "$EXIT_UNSUPPORTED" ;;
     esac
 
     case "$os" in
         linux)  echo "linux-${arch}" ;;
         darwin) echo "darwin-${arch}" ;;
-        *)      fail "unsupported OS: $os" ;;
+        *) fail "unsupported OS: $os (supported: macOS, Linux)" "$EXIT_UNSUPPORTED" ;;
     esac
 }
 
-latest_version() {
-    if command -v curl &>/dev/null; then
-        curl -fsSL "https://api.github.com/repos/${REPO}/releases/latest" | grep '"tag_name"' | cut -d'"' -f4
-    elif command -v wget &>/dev/null; then
-        wget -qO- "https://api.github.com/repos/${REPO}/releases/latest" | grep '"tag_name"' | cut -d'"' -f4
+# ---- Network helpers ----
+
+http_get() {
+    # Fetch URL to stdout. Loudly on any non-2xx or connection error.
+    local url="$1"
+    if command -v curl >/dev/null 2>&1; then
+        curl -fsSL "$url" || fail "failed to fetch $url" "$EXIT_NETWORK"
+    elif command -v wget >/dev/null 2>&1; then
+        wget -qO- "$url" || fail "failed to fetch $url" "$EXIT_NETWORK"
     else
-        fail "curl or wget required"
+        fail "curl or wget is required" "$EXIT_NETWORK"
     fi
 }
 
-download() {
+http_download() {
     local url="$1" dest="$2"
-    if command -v curl &>/dev/null; then
-        curl -fsSL "$url" -o "$dest"
+    if command -v curl >/dev/null 2>&1; then
+        curl -fsSL "$url" -o "$dest" || fail "failed to download $url" "$EXIT_NETWORK"
+    elif command -v wget >/dev/null 2>&1; then
+        wget -qO "$dest" "$url" || fail "failed to download $url" "$EXIT_NETWORK"
     else
-        wget -qO "$dest" "$url"
+        fail "curl or wget is required" "$EXIT_NETWORK"
     fi
 }
 
-# ---- install ----
+# ---- Version resolution ----
+
+resolve_version() {
+    if [ -n "$PINNED_VERSION" ]; then
+        echo "$PINNED_VERSION"
+        return
+    fi
+    local json tag
+    json="$(http_get "https://api.github.com/repos/${REPO}/releases/latest")"
+    if command -v jq >/dev/null 2>&1; then
+        tag="$(printf '%s' "$json" | jq -r '.tag_name // empty')"
+    else
+        # Strict anchored regex; fails loudly if the JSON shape shifts so we
+        # never silently install the wrong version.
+        tag="$(printf '%s' "$json" | sed -nE 's/.*"tag_name"[[:space:]]*:[[:space:]]*"([^"]+)".*/\1/p' | head -n1)"
+    fi
+    [ -n "$tag" ] || fail "could not resolve latest version (API response missing tag_name)" "$EXIT_NETWORK"
+    echo "$tag"
+}
+
+# ---- Checksum ----
+
+sha256_check() {
+    # Verify that a file matches its line in a SHA256SUMS file.
+    # Linux has sha256sum; macOS has shasum -a 256. Both accept -c on stdin.
+    local file="$1" sums="$2" base tool
+    base="$(basename "$file")"
+
+    if command -v sha256sum >/dev/null 2>&1; then
+        tool=(sha256sum -c -)
+    elif command -v shasum >/dev/null 2>&1; then
+        tool=(shasum -a 256 -c -)
+    else
+        fail "no sha256 tool found (need sha256sum or shasum)" "$EXIT_VERIFY"
+    fi
+
+    (
+        cd "$(dirname "$file")" &&
+        grep " ${base}\$" "$sums" | "${tool[@]}" >/dev/null
+    ) || fail "sha256 mismatch for $base" "$EXIT_VERIFY"
+}
+
+# ---- Shell rc editing ----
+
+detect_shell_rc() {
+    # Prefer the rc matching the current login shell. Falls back to the first
+    # existing rc file. Returns empty if none match (caller warns and skips).
+    case "${SHELL:-}" in
+        */zsh)  echo "$HOME/.zshrc";  return ;;
+        */bash) echo "$HOME/.bashrc"; return ;;
+    esac
+    for rc in "$HOME/.zshrc" "$HOME/.bashrc" "$HOME/.bash_profile"; do
+        [ -f "$rc" ] && { echo "$rc"; return; }
+    done
+}
+
+remove_rc_block() {
+    local rc="$1"
+    [ -f "$rc" ] || return 0
+    grep -qxF "$RC_BEGIN" "$rc" || return 0
+    # Portable block-delete: awk handles BSD/GNU sed differences.
+    awk -v b="$RC_BEGIN" -v e="$RC_END" '
+        $0 == b { skip = 1; next }
+        $0 == e { skip = 0; next }
+        !skip
+    ' "$rc" > "$rc.frugal.tmp" && mv "$rc.frugal.tmp" "$rc"
+}
+
+write_rc_block() {
+    local rc="$1"
+    remove_rc_block "$rc"
+    # >> creates the file if it doesn't exist (fresh-Mac with no ~/.zshrc case).
+    {
+        echo ""
+        echo "$RC_BEGIN"
+        echo "# Added by frugal.sh installer. Remove this block to uninstall PATH."
+        echo "export PATH=\"$BIN_DIR:\$PATH\""
+        echo "export FRUGAL_CONFIG=\"$CONFIG_DIR/models.yaml\""
+        echo "$RC_END"
+    } >> "$rc"
+}
+
+# ---- Uninstall ----
 
 uninstall() {
     info "uninstalling frugal.sh"
+
     if [ -d "$INSTALL_DIR" ]; then
-        rm -rf "$INSTALL_DIR"
-        ok "removed $INSTALL_DIR"
+        # Guardrail: only rm -rf paths that look like a Frugal install dir.
+        # Belt-and-suspenders against a mis-set FRUGAL_INSTALL_DIR.
+        case "$INSTALL_DIR" in
+            "$HOME/.frugal"|*/.frugal|*/frugal)
+                rm -rf "$INSTALL_DIR"
+                ok "removed $INSTALL_DIR"
+                ;;
+            *)
+                warn "refusing to remove unexpected INSTALL_DIR: $INSTALL_DIR"
+                warn "remove it by hand if you meant to"
+                ;;
+        esac
     fi
 
-    # Remove the lines install.sh appended to the user's shell rc files.
     for rc in "$HOME/.zshrc" "$HOME/.bashrc" "$HOME/.bash_profile"; do
-        if [ -f "$rc" ] && grep -q "# frugal.sh" "$rc"; then
-            # Portable in-place edit: filter into a temp file then replace.
-            grep -v -E '^# frugal\.sh$|^export PATH="'"$BIN_DIR"':\$PATH"$|^export FRUGAL_CONFIG="'"$CONFIG_DIR"'/models\.yaml"$' "$rc" > "$rc.tmp"
-            mv "$rc.tmp" "$rc"
+        if [ -f "$rc" ] && grep -qxF "$RC_BEGIN" "$rc"; then
+            remove_rc_block "$rc"
             ok "cleaned $rc"
         fi
     done
+
     echo
     echo "frugal.sh uninstalled."
     exit 0
 }
+
+# ---- Install ----
 
 main() {
     if [ "${1:-}" = "uninstall" ]; then
         uninstall
     fi
 
-    info "installing frugal.sh — the open-source LLM cost optimizer"
+    info "installing frugal.sh — the open-source AI toolchain cost optimizer"
     echo
 
-    # Detect platform
-    local platform
+    local platform version
     platform="$(detect_platform)"
     ok "detected platform: $platform"
 
-    # Get latest version (or build from source if no releases yet)
-    local version
-    version="$(latest_version 2>/dev/null || echo "")"
+    info "resolving version..."
+    version="$(resolve_version)"
+    ok "target version: $version"
+
+    local shell_config
+    shell_config="$(detect_shell_rc || true)"
+
+    # Show what's about to happen. Interactive sessions get a prompt;
+    # FRUGAL_YES=1 and non-TTY runs (e.g. CI, curl-pipe-sh) skip it.
+    echo
+    echo "This installer will:"
+    echo "  * install frugal $version to $BIN_DIR/frugal"
+    echo "  * write a marker block to ${shell_config:-<none found; skipping>} for PATH + FRUGAL_CONFIG"
+    echo "  * leave default config at $CONFIG_DIR/models.yaml"
+    if [ -t 0 ] && [ "${FRUGAL_YES:-}" != "1" ]; then
+        printf "Proceed? [Y/n] "
+        local answer
+        read -r answer </dev/tty || answer="Y"
+        case "$answer" in
+            ""|y|Y|yes|Yes) ;;
+            *) fail "aborted by user" "$EXIT_LOCAL" ;;
+        esac
+    fi
+    echo
+
+    # Every download goes through a tmpdir. The final binary lands in BIN_DIR
+    # only after verification succeeds. If the script exits early, the tmpdir
+    # is cleaned and BIN_DIR is never polluted with an untrusted binary.
+    local tmpdir
+    tmpdir="$(mktemp -d)"
+    trap 'rm -rf "$tmpdir"' EXIT
 
     mkdir -p "$BIN_DIR" "$CONFIG_DIR"
 
-    if [ -n "$version" ]; then
-        info "downloading frugal $version for $platform..."
-        local base="https://github.com/${REPO}/releases/download/${version}"
-        local artifact="frugal-${platform}"
-        download "${base}/${artifact}" "$BIN_DIR/${artifact}"
+    local base="https://github.com/${REPO}/releases/download/${version}"
+    local artifact="frugal-${platform}"
 
-        # Integrity: verify SHA256SUMS before trusting the binary. The
-        # checksum file is cosign-signed on release; verify the signature
-        # when cosign is available, otherwise fall back to checksum only
-        # with a loud warning. Refuse to install a binary that fails the
-        # checksum check — the alternative is arbitrary code execution.
-        download "${base}/SHA256SUMS" "$BIN_DIR/SHA256SUMS"
-        if command -v cosign &>/dev/null; then
-            download "${base}/SHA256SUMS.sig" "$BIN_DIR/SHA256SUMS.sig"
-            cosign verify-blob \
-                --bundle "$BIN_DIR/SHA256SUMS.sig" \
-                --certificate-identity-regexp "https://github.com/${REPO}/.github/workflows/release.yml@refs/tags/" \
-                --certificate-oidc-issuer https://token.actions.githubusercontent.com \
-                "$BIN_DIR/SHA256SUMS" \
-                || fail "cosign verification failed for SHA256SUMS — refusing to install"
-            ok "cosign signature verified"
-        else
-            warn "cosign not found — skipping signature verification (install cosign to enable)"
-        fi
+    info "downloading $artifact..."
+    http_download "${base}/${artifact}" "$tmpdir/${artifact}"
+    http_download "${base}/SHA256SUMS"  "$tmpdir/SHA256SUMS"
 
-        (cd "$BIN_DIR" && grep " ${artifact}\$" SHA256SUMS | shasum -a 256 -c -) \
-            || fail "sha256 mismatch for ${artifact} — refusing to install"
-
-        mv "$BIN_DIR/${artifact}" "$BIN_DIR/frugal"
-        rm -f "$BIN_DIR/SHA256SUMS" "$BIN_DIR/SHA256SUMS.sig"
-        chmod +x "$BIN_DIR/frugal"
-        ok "downloaded frugal $version"
+    # Trust chain: cosign -> SHA256SUMS -> binary hash -> binary.
+    # Cosign is preferred; when it's not installed we keep installing (don't
+    # block first-time users on a new dependency) but say so loudly.
+    if command -v cosign >/dev/null 2>&1; then
+        http_download "${base}/SHA256SUMS.sig" "$tmpdir/SHA256SUMS.sig"
+        cosign verify-blob \
+            --bundle "$tmpdir/SHA256SUMS.sig" \
+            --certificate-identity-regexp "https://github.com/${REPO}/.github/workflows/release.yml@refs/tags/" \
+            --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+            "$tmpdir/SHA256SUMS" >/dev/null \
+            || fail "cosign signature verification failed for SHA256SUMS" "$EXIT_VERIFY"
+        ok "cosign signature verified"
     else
-        # No releases yet — build from source
-        info "no release found, building from source..."
-        if ! command -v go &>/dev/null; then
-            fail "go is required to build from source (install: https://go.dev/dl/)"
-        fi
-
-        local tmpdir
-        tmpdir="$(mktemp -d)"
-        trap "rm -rf $tmpdir" EXIT
-
-        if command -v git &>/dev/null; then
-            git clone --depth 1 "https://github.com/${REPO}.git" "$tmpdir/frugal" 2>/dev/null
-        else
-            download "https://github.com/${REPO}/archive/refs/heads/main.tar.gz" "$tmpdir/frugal.tar.gz"
-            tar -xzf "$tmpdir/frugal.tar.gz" -C "$tmpdir"
-            mv "$tmpdir/frugal-main" "$tmpdir/frugal"
-        fi
-
-        (cd "$tmpdir/frugal" && go build -o "$BIN_DIR/frugal" ./cmd/frugal)
-        cp "$tmpdir/frugal/config/models.yaml" "$CONFIG_DIR/models.yaml"
-        ok "built frugal from source"
+        warn "cosign not found — signature check skipped"
+        warn "install cosign to enable: https://docs.sigstore.dev/cosign/installation/"
     fi
 
-    # Download default config if not present
+    sha256_check "$tmpdir/$artifact" "$tmpdir/SHA256SUMS"
+    ok "checksum verified"
+
+    # Atomic promotion: one mv, not a copy + chmod dance.
+    chmod +x "$tmpdir/$artifact"
+    mv "$tmpdir/$artifact" "$BIN_DIR/frugal"
+    ok "installed frugal $version to $BIN_DIR/frugal"
+
+    # Default config: fetch only if missing so re-runs don't clobber edits.
     if [ ! -f "$CONFIG_DIR/models.yaml" ]; then
-        info "downloading model config..."
-        download "https://raw.githubusercontent.com/${REPO}/main/config/models.yaml" "$CONFIG_DIR/models.yaml"
-        ok "config saved to $CONFIG_DIR/models.yaml"
+        info "downloading default model config..."
+        http_download "https://raw.githubusercontent.com/${REPO}/main/config/models.yaml" \
+                      "$CONFIG_DIR/models.yaml"
+        ok "default config saved to $CONFIG_DIR/models.yaml"
+    else
+        ok "config already present at $CONFIG_DIR/models.yaml (kept)"
     fi
 
-    echo
-    info "detecting API keys..."
-
-    local keys_found=0
-    [ -n "${OPENAI_API_KEY:-}" ]    && { ok "OPENAI_API_KEY found";    keys_found=$((keys_found + 1)); }
-    [ -n "${ANTHROPIC_API_KEY:-}" ] && { ok "ANTHROPIC_API_KEY found"; keys_found=$((keys_found + 1)); }
-    [ -n "${GOOGLE_API_KEY:-}" ]    && { ok "GOOGLE_API_KEY found";    keys_found=$((keys_found + 1)); }
-
-    if [ "$keys_found" -eq 0 ]; then
-        warn "no API keys found in environment"
-        echo "  Set at least one of: OPENAI_API_KEY, ANTHROPIC_API_KEY, GOOGLE_API_KEY"
-        echo "  Then run: frugal"
-        echo
-    fi
-
-    # Add to PATH
-    local shell_config=""
-    local export_line="export PATH=\"$BIN_DIR:\$PATH\""
-    local config_line="export FRUGAL_CONFIG=\"$CONFIG_DIR/models.yaml\""
-
-    if [ -f "$HOME/.zshrc" ]; then
-        shell_config="$HOME/.zshrc"
-    elif [ -f "$HOME/.bashrc" ]; then
-        shell_config="$HOME/.bashrc"
-    elif [ -f "$HOME/.bash_profile" ]; then
-        shell_config="$HOME/.bash_profile"
-    fi
-
+    # Shell rc wiring.
     if [ -n "$shell_config" ]; then
-        if ! grep -q ".frugal/bin" "$shell_config" 2>/dev/null; then
-            echo "" >> "$shell_config"
-            echo "# frugal.sh" >> "$shell_config"
-            echo "$export_line" >> "$shell_config"
-            echo "$config_line" >> "$shell_config"
-            ok "added to PATH in $shell_config"
-        fi
+        write_rc_block "$shell_config"
+        ok "shell config updated: $shell_config"
+    else
+        warn "no shell rc file found; add this to your shell profile:"
+        echo "    export PATH=\"$BIN_DIR:\$PATH\""
+        echo "    export FRUGAL_CONFIG=\"$CONFIG_DIR/models.yaml\""
     fi
 
-    # Also export for current session
+    # Export for this process so the smoke test below finds the binary.
     export PATH="$BIN_DIR:$PATH"
     export FRUGAL_CONFIG="$CONFIG_DIR/models.yaml"
+
+    # Post-install smoke test: if --version doesn't respond, something's off
+    # even if every prior step reported success (corrupt file on disk, wrong
+    # arch artifact, exec bit stripped by a weird umask, etc).
+    if "$BIN_DIR/frugal" --version >/dev/null 2>&1; then
+        ok "smoke test: frugal --version OK"
+    else
+        fail "smoke test failed: $BIN_DIR/frugal --version did not exit cleanly" "$EXIT_VERIFY"
+    fi
+
+    # Key detection — informational only.
+    echo
+    info "detecting provider API keys..."
+    local keys=0
+    [ -n "${OPENAI_API_KEY:-}"    ] && { ok "OPENAI_API_KEY found";    keys=$((keys + 1)); }
+    [ -n "${ANTHROPIC_API_KEY:-}" ] && { ok "ANTHROPIC_API_KEY found"; keys=$((keys + 1)); }
+    [ -n "${GOOGLE_API_KEY:-}"    ] && { ok "GOOGLE_API_KEY found";    keys=$((keys + 1)); }
+    if [ "$keys" -eq 0 ]; then
+        warn "no provider API keys in environment"
+        echo "  Set at least one of: OPENAI_API_KEY, ANTHROPIC_API_KEY, GOOGLE_API_KEY"
+    fi
 
     echo
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
     echo
-    echo "  frugal.sh installed!"
+    echo "  frugal.sh installed"
     echo
     echo "  Start the proxy:"
     echo "    frugal"
     echo
-    echo "  Then point your app at it:"
+    echo "  Point your app at it:"
     echo "    export OPENAI_BASE_URL=http://localhost:8080/v1"
     echo
-    echo "  That's it. Same code. Same SDK. Lower bill."
+    echo "  Route by use case:"
+    echo "    curl -H 'X-Frugal-Use-Case: research-synthesis' ..."
+    echo
+    echo "  Uninstall:"
+    echo "    curl -fsSL https://frugal.sh/install | sh -s uninstall"
     echo
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
     echo
