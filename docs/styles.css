@@ -188,13 +188,6 @@ h3 { font-size: 1.05rem; }
   border-radius: 999px;
   background: var(--surface);
 }
-.pills-caps { margin: 28px 0 12px; }
-.pills-caps span {
-  color: var(--fg);
-  border-color: var(--accent);
-  background: var(--accent-soft);
-}
-
 .cta { display: flex; flex-wrap: wrap; gap: 12px; }
 
 .btn {
