@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -75,5 +76,150 @@ func TestLoad_MissingFile(t *testing.T) {
 	_, err := Load("/nonexistent/path/config.yaml")
 	if err == nil {
 		t.Error("expected error for missing file")
+	}
+}
+
+func TestLoad_RejectsUnknownFields(t *testing.T) {
+	content := `
+providers:
+  openai:
+    api_key_env: OPENAI_API_KEY
+    base_url: https://api.openai.com/v1
+    models:
+      gpt-4o:
+        cost_per_1k_input: 0.0025
+        cost_per_1k_output: 0.01
+        capabilities:
+          reasoning: 0.95
+          coding: 0.92
+          creative: 0.90
+          instruction_following: 0.95
+          tool_use: true
+          json_mode: true
+          max_context: 128000
+          typo_field: true
+quality_thresholds:
+  balanced:
+    min_reasoning: 0.70
+    min_coding: 0.68
+    min_creative: 0.65
+    min_instruction_following: 0.72
+`
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.yaml")
+	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	_, err := Load(path)
+	if err == nil {
+		t.Fatal("expected error for unknown field")
+	}
+	if !strings.Contains(err.Error(), "typo_field") {
+		t.Fatalf("expected unknown field error to mention typo_field, got: %v", err)
+	}
+}
+
+func TestLoad_RejectsMissingProviders(t *testing.T) {
+	content := `
+quality_thresholds:
+  balanced:
+    min_reasoning: 0.70
+    min_coding: 0.68
+    min_creative: 0.65
+    min_instruction_following: 0.72
+`
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.yaml")
+	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	_, err := Load(path)
+	if err == nil {
+		t.Fatal("expected validation error for missing providers")
+	}
+	if !strings.Contains(err.Error(), "providers must contain at least one provider") {
+		t.Fatalf("expected providers validation error, got: %v", err)
+	}
+}
+
+func TestLoad_RejectsOutOfRangeCapability(t *testing.T) {
+	content := `
+providers:
+  openai:
+    api_key_env: OPENAI_API_KEY
+    base_url: https://api.openai.com/v1
+    models:
+      gpt-4o:
+        cost_per_1k_input: 0.0025
+        cost_per_1k_output: 0.01
+        capabilities:
+          reasoning: 1.2
+          coding: 0.92
+          creative: 0.90
+          instruction_following: 0.95
+          tool_use: true
+          json_mode: true
+          max_context: 128000
+quality_thresholds:
+  balanced:
+    min_reasoning: 0.70
+    min_coding: 0.68
+    min_creative: 0.65
+    min_instruction_following: 0.72
+`
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.yaml")
+	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	_, err := Load(path)
+	if err == nil {
+		t.Fatal("expected validation error for capability range")
+	}
+	if !strings.Contains(err.Error(), "capabilities.reasoning") {
+		t.Fatalf("expected capability reasoning validation error, got: %v", err)
+	}
+}
+
+func TestLoad_RejectsNegativeModelCost(t *testing.T) {
+	content := `
+providers:
+  openai:
+    api_key_env: OPENAI_API_KEY
+    base_url: https://api.openai.com/v1
+    models:
+      gpt-4o:
+        cost_per_1k_input: -0.01
+        cost_per_1k_output: 0.01
+        capabilities:
+          reasoning: 0.95
+          coding: 0.92
+          creative: 0.90
+          instruction_following: 0.95
+          tool_use: true
+          json_mode: true
+          max_context: 128000
+quality_thresholds:
+  balanced:
+    min_reasoning: 0.70
+    min_coding: 0.68
+    min_creative: 0.65
+    min_instruction_following: 0.72
+`
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.yaml")
+	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	_, err := Load(path)
+	if err == nil {
+		t.Fatal("expected validation error for negative model cost")
+	}
+	if !strings.Contains(err.Error(), "cost_per_1k_input") {
+		t.Fatalf("expected cost_per_1k_input validation error, got: %v", err)
 	}
 }

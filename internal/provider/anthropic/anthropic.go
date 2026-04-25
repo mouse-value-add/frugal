@@ -1,7 +1,6 @@
 package anthropic
 
 import (
-	"bufio"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -17,6 +16,19 @@ import (
 
 const anthropicVersion = "2023-06-01"
 
+const errorBodyLimit = 8 << 10 // 8 KiB
+
+func readErrorBody(r io.Reader) string {
+	body, err := io.ReadAll(io.LimitReader(r, errorBodyLimit+1))
+	if err != nil {
+		return "<failed to read error body>"
+	}
+	if len(body) > errorBodyLimit {
+		return string(body[:errorBodyLimit]) + "... (truncated)"
+	}
+	return string(body)
+}
+
 type Provider struct {
 	apiKey  string
 	baseURL string
@@ -29,7 +41,7 @@ func New(apiKey, baseURL string, models []string) *Provider {
 		apiKey:  apiKey,
 		baseURL: baseURL,
 		models:  models,
-		client:  &http.Client{},
+		client:  provider.NewHTTPClient(),
 	}
 }
 
@@ -40,17 +52,38 @@ func (p *Provider) Models() []string { return p.models }
 // -- Anthropic API types --
 
 type messagesRequest struct {
-	Model     string           `json:"model"`
-	MaxTokens int              `json:"max_tokens"`
-	System    string           `json:"system,omitempty"`
-	Messages  []anthropicMsg   `json:"messages"`
-	Stream    bool             `json:"stream,omitempty"`
-	Tools     []anthropicTool  `json:"tools,omitempty"`
+	Model     string          `json:"model"`
+	MaxTokens int             `json:"max_tokens"`
+	System    string          `json:"system,omitempty"`
+	Messages  []anthropicMsg  `json:"messages"`
+	Stream    bool            `json:"stream,omitempty"`
+	Tools     []anthropicTool `json:"tools,omitempty"`
 }
 
 type anthropicMsg struct {
-	Role    string `json:"role"`
-	Content string `json:"content"`
+	Role    string              `json:"role"`
+	Content []anthropicContent  `json:"content"`
+}
+
+// anthropicContent is Anthropic's content block. Emitted block types today:
+// text, image, tool_result. tool_use for assistant-origin tool calls is
+// handled by the upstream model; Frugal does not synthesize it.
+type anthropicContent struct {
+	Type      string           `json:"type"`
+	Text      string           `json:"text,omitempty"`
+	Source    *anthropicSource `json:"source,omitempty"`
+	ToolUseID string           `json:"tool_use_id,omitempty"`
+	Content   string           `json:"content,omitempty"` // tool_result body
+	// CacheControl is forwarded verbatim so callers can opt into Anthropic
+	// prompt caching without Frugal stripping the hint.
+	CacheControl json.RawMessage `json:"cache_control,omitempty"`
+}
+
+type anthropicSource struct {
+	Type      string `json:"type"`                 // "base64" or "url"
+	MediaType string `json:"media_type,omitempty"` // required for base64
+	Data      string `json:"data,omitempty"`       // base64 payload
+	URL       string `json:"url,omitempty"`        // for type:"url"
 }
 
 type anthropicTool struct {
@@ -60,12 +93,12 @@ type anthropicTool struct {
 }
 
 type messagesResponse struct {
-	ID      string            `json:"id"`
-	Type    string            `json:"type"`
-	Role    string            `json:"role"`
-	Content []contentBlock    `json:"content"`
-	Model   string            `json:"model"`
-	Usage   anthropicUsage    `json:"usage"`
+	ID         string         `json:"id"`
+	Type       string         `json:"type"`
+	Role       string         `json:"role"`
+	Content    []contentBlock `json:"content"`
+	Model      string         `json:"model"`
+	Usage      anthropicUsage `json:"usage"`
 	StopReason string         `json:"stop_reason"`
 }
 
@@ -107,21 +140,35 @@ func translateRequest(req *types.ChatCompletionRequest, model string) *messagesR
 	maxTokens := 4096
 	if req.MaxTokens != nil {
 		maxTokens = *req.MaxTokens
+	} else if req.MaxCompletionTokens != nil {
+		maxTokens = *req.MaxCompletionTokens
 	}
 	ar.MaxTokens = maxTokens
 
 	for _, msg := range req.Messages {
 		if msg.Role == "system" {
-			ar.System = msg.ContentString()
+			ar.System = msg.ContentText()
 			continue
 		}
-		role := msg.Role
-		if role == "tool" {
-			role = "user" // Anthropic handles tool results differently, simplify for now
+
+		// Tool results ride on a user message as a tool_result block so the
+		// upstream model can correlate them to the prior tool_use. OpenAI
+		// represents them as role="tool" with tool_call_id.
+		if msg.Role == "tool" {
+			ar.Messages = append(ar.Messages, anthropicMsg{
+				Role: "user",
+				Content: []anthropicContent{{
+					Type:      "tool_result",
+					ToolUseID: msg.ToolCallID,
+					Content:   msg.ContentText(),
+				}},
+			})
+			continue
 		}
+
 		ar.Messages = append(ar.Messages, anthropicMsg{
-			Role:    role,
-			Content: msg.ContentString(),
+			Role:    msg.Role,
+			Content: toAnthropicContent(msg),
 		})
 	}
 
@@ -134,6 +181,58 @@ func translateRequest(req *types.ChatCompletionRequest, model string) *messagesR
 	}
 
 	return ar
+}
+
+// toAnthropicContent translates an OpenAI message into Anthropic's content
+// block array. Text parts become {type:"text"}; image_url parts become
+// {type:"image"} with either a base64 or url source depending on the input.
+// Per-part cache_control hints forward verbatim so Anthropic prompt-caching
+// works without Frugal stripping the marker.
+func toAnthropicContent(msg types.Message) []anthropicContent {
+	parts := msg.ContentParts()
+	if len(parts) == 0 {
+		return []anthropicContent{{Type: "text", Text: ""}}
+	}
+	out := make([]anthropicContent, 0, len(parts))
+	for _, p := range parts {
+		switch p.Type {
+		case "", "text":
+			out = append(out, anthropicContent{Type: "text", Text: p.Text, CacheControl: p.CacheControl})
+		case "image_url":
+			if p.ImageURL == nil {
+				continue
+			}
+			src := imageURLToAnthropicSource(p.ImageURL.URL)
+			if src == nil {
+				continue
+			}
+			out = append(out, anthropicContent{Type: "image", Source: src, CacheControl: p.CacheControl})
+		}
+	}
+	if len(out) == 0 {
+		out = append(out, anthropicContent{Type: "text", Text: ""})
+	}
+	return out
+}
+
+func imageURLToAnthropicSource(url string) *anthropicSource {
+	const dataPrefix = "data:"
+	if strings.HasPrefix(url, dataPrefix) {
+		// data:image/png;base64,<payload>
+		rest := url[len(dataPrefix):]
+		semi := strings.Index(rest, ";")
+		comma := strings.Index(rest, ",")
+		if semi < 0 || comma < 0 || semi > comma {
+			return nil
+		}
+		media := rest[:semi]
+		data := rest[comma+1:]
+		return &anthropicSource{Type: "base64", MediaType: media, Data: data}
+	}
+	if strings.HasPrefix(url, "http://") || strings.HasPrefix(url, "https://") {
+		return &anthropicSource{Type: "url", URL: url}
+	}
+	return nil
 }
 
 func translateResponse(ar *messagesResponse) *types.ChatCompletionResponse {
@@ -213,8 +312,7 @@ func (p *Provider) ChatCompletion(ctx context.Context, model string, req *types.
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		respBody, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("anthropic error %d: %s", resp.StatusCode, string(respBody))
+		return nil, fmt.Errorf("anthropic error %d: %s", resp.StatusCode, readErrorBody(resp.Body))
 	}
 
 	var result messagesResponse
@@ -249,8 +347,7 @@ func (p *Provider) ChatCompletionStream(ctx context.Context, model string, req *
 
 	if resp.StatusCode != http.StatusOK {
 		defer resp.Body.Close()
-		respBody, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("anthropic error %d: %s", resp.StatusCode, string(respBody))
+		return nil, fmt.Errorf("anthropic error %d: %s", resp.StatusCode, readErrorBody(resp.Body))
 	}
 
 	ch := make(chan provider.StreamChunk, 8)
@@ -259,7 +356,7 @@ func (p *Provider) ChatCompletionStream(ctx context.Context, model string, req *
 		defer resp.Body.Close()
 
 		chunkID := fmt.Sprintf("chatcmpl-%s", ar.Model)
-		scanner := bufio.NewScanner(resp.Body)
+		scanner := provider.NewSSEScanner(resp.Body)
 
 		for scanner.Scan() {
 			line := scanner.Text()
