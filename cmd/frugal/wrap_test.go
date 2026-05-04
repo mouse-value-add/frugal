@@ -1,8 +1,10 @@
 package main
 
 import (
+	"net/http"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestInjectEnv_OverridesExistingBaseURLsWithoutDuplicates(t *testing.T) {
@@ -62,6 +64,54 @@ func countEnvKey(env []string, key string) int {
 		}
 	}
 	return count
+}
+
+func TestNewWrapHTTPServer_DefaultsAndEnvOverrides(t *testing.T) {
+	t.Setenv("FRUGAL_READ_HEADER_TIMEOUT", "")
+	t.Setenv("FRUGAL_READ_TIMEOUT", "")
+	t.Setenv("FRUGAL_WRITE_TIMEOUT", "")
+	t.Setenv("FRUGAL_IDLE_TIMEOUT", "")
+	t.Setenv("FRUGAL_MAX_HEADER_BYTES", "")
+
+	srv := newWrapHTTPServer(http.NewServeMux())
+	if srv.ReadHeaderTimeout != 5*time.Second {
+		t.Fatalf("expected default read header timeout 5s, got %s", srv.ReadHeaderTimeout)
+	}
+	if srv.ReadTimeout != 15*time.Second {
+		t.Fatalf("expected default read timeout 15s, got %s", srv.ReadTimeout)
+	}
+	if srv.WriteTimeout != 120*time.Second {
+		t.Fatalf("expected default write timeout 120s, got %s", srv.WriteTimeout)
+	}
+	if srv.IdleTimeout != 60*time.Second {
+		t.Fatalf("expected default idle timeout 60s, got %s", srv.IdleTimeout)
+	}
+	if srv.MaxHeaderBytes != http.DefaultMaxHeaderBytes {
+		t.Fatalf("expected default max header bytes %d, got %d", http.DefaultMaxHeaderBytes, srv.MaxHeaderBytes)
+	}
+
+	t.Setenv("FRUGAL_READ_HEADER_TIMEOUT", "7s")
+	t.Setenv("FRUGAL_READ_TIMEOUT", "20s")
+	t.Setenv("FRUGAL_WRITE_TIMEOUT", "150s")
+	t.Setenv("FRUGAL_IDLE_TIMEOUT", "75s")
+	t.Setenv("FRUGAL_MAX_HEADER_BYTES", "65536")
+
+	srv = newWrapHTTPServer(http.NewServeMux())
+	if srv.ReadHeaderTimeout != 7*time.Second {
+		t.Fatalf("expected read header timeout 7s, got %s", srv.ReadHeaderTimeout)
+	}
+	if srv.ReadTimeout != 20*time.Second {
+		t.Fatalf("expected read timeout 20s, got %s", srv.ReadTimeout)
+	}
+	if srv.WriteTimeout != 150*time.Second {
+		t.Fatalf("expected write timeout 150s, got %s", srv.WriteTimeout)
+	}
+	if srv.IdleTimeout != 75*time.Second {
+		t.Fatalf("expected idle timeout 75s, got %s", srv.IdleTimeout)
+	}
+	if srv.MaxHeaderBytes != 65536 {
+		t.Fatalf("expected max header bytes 65536, got %d", srv.MaxHeaderBytes)
+	}
 }
 
 func valueForEnvKey(env []string, key string) string {
