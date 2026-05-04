@@ -118,6 +118,20 @@ func TestEnvDurationOrDefaultInvalidValues(t *testing.T) {
 	}
 }
 
+func TestEnvDurationCappedOrDefault(t *testing.T) {
+	const key = "FRUGAL_TIMEOUT_CAP_TEST"
+
+	t.Setenv(key, "30s")
+	if got := envDurationCappedOrDefault(key, 3*time.Second, time.Minute); got != 30*time.Second {
+		t.Fatalf("expected parsed duration under cap, got %s", got)
+	}
+
+	t.Setenv(key, "2m")
+	if got := envDurationCappedOrDefault(key, 3*time.Second, time.Minute); got != 3*time.Second {
+		t.Fatalf("expected fallback when duration exceeds cap, got %s", got)
+	}
+}
+
 func TestEnvIntOrDefaultInvalidValues(t *testing.T) {
 	const key = "FRUGAL_INT_TEST"
 
@@ -134,5 +148,24 @@ func TestEnvIntOrDefaultInvalidValues(t *testing.T) {
 	t.Setenv(key, "-10")
 	if got := envIntOrDefault(key, 1234); got != 1234 {
 		t.Fatalf("expected fallback for negative int, got %d", got)
+	}
+}
+
+func TestEnvIntRangeOrDefault(t *testing.T) {
+	const key = "FRUGAL_INT_RANGE_TEST"
+
+	t.Setenv(key, "65536")
+	if got := envIntRangeOrDefault(key, 1234, 1024, 1<<20); got != 65536 {
+		t.Fatalf("expected value in range, got %d", got)
+	}
+
+	t.Setenv(key, "512")
+	if got := envIntRangeOrDefault(key, 1234, 1024, 1<<20); got != 1234 {
+		t.Fatalf("expected fallback below min, got %d", got)
+	}
+
+	t.Setenv(key, "2097152")
+	if got := envIntRangeOrDefault(key, 1234, 1024, 1<<20); got != 1234 {
+		t.Fatalf("expected fallback above max, got %d", got)
 	}
 }

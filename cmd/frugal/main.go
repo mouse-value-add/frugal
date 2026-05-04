@@ -333,11 +333,11 @@ func newHTTPServer(addr string, handler http.Handler) *http.Server {
 	return &http.Server{
 		Addr:              addr,
 		Handler:           handler,
-		ReadHeaderTimeout: envDurationOrDefault("FRUGAL_READ_HEADER_TIMEOUT", 5*time.Second),
-		ReadTimeout:       envDurationOrDefault("FRUGAL_READ_TIMEOUT", 15*time.Second),
-		WriteTimeout:      envDurationOrDefault("FRUGAL_WRITE_TIMEOUT", 120*time.Second),
-		IdleTimeout:       envDurationOrDefault("FRUGAL_IDLE_TIMEOUT", 60*time.Second),
-		MaxHeaderBytes:    envIntOrDefault("FRUGAL_MAX_HEADER_BYTES", http.DefaultMaxHeaderBytes),
+		ReadHeaderTimeout: envDurationCappedOrDefault("FRUGAL_READ_HEADER_TIMEOUT", 5*time.Second, 5*time.Minute),
+		ReadTimeout:       envDurationCappedOrDefault("FRUGAL_READ_TIMEOUT", 15*time.Second, 5*time.Minute),
+		WriteTimeout:      envDurationCappedOrDefault("FRUGAL_WRITE_TIMEOUT", 120*time.Second, 10*time.Minute),
+		IdleTimeout:       envDurationCappedOrDefault("FRUGAL_IDLE_TIMEOUT", 60*time.Second, 10*time.Minute),
+		MaxHeaderBytes:    envIntRangeOrDefault("FRUGAL_MAX_HEADER_BYTES", http.DefaultMaxHeaderBytes, 1024, 1<<20),
 	}
 }
 
@@ -356,6 +356,15 @@ func envDurationOrDefault(key string, fallback time.Duration) time.Duration {
 	return parsed
 }
 
+func envDurationCappedOrDefault(key string, fallback time.Duration, max time.Duration) time.Duration {
+	parsed := envDurationOrDefault(key, fallback)
+	if parsed > max {
+		slog.Warn("env duration exceeds cap; using default", "key", key, "value", parsed.String(), "cap", max.String(), "default", fallback.String())
+		return fallback
+	}
+	return parsed
+}
+
 func envIntOrDefault(key string, fallback int) int {
 	value := os.Getenv(key)
 	if value == "" {
@@ -368,6 +377,15 @@ func envIntOrDefault(key string, fallback int) int {
 		return fallback
 	}
 
+	return parsed
+}
+
+func envIntRangeOrDefault(key string, fallback int, min int, max int) int {
+	parsed := envIntOrDefault(key, fallback)
+	if parsed < min || parsed > max {
+		slog.Warn("env int out of allowed range; using default", "key", key, "value", parsed, "min", min, "max", max, "default", fallback)
+		return fallback
+	}
 	return parsed
 }
 
