@@ -1,5 +1,11 @@
 # frugal.sh Positioning v2
 
+> **Superseded by [`frugal-strategy-v3.md`](./frugal-strategy-v3.md)** as of 2026-05-05.
+> Kept for historical reference; do not edit.
+
+---
+
+
 ## One-liner
 frugal.sh helps AI apps choose the cheapest path to a good answer.
 

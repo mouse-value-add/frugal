@@ -1,5 +1,12 @@
 # frugal.sh/benchmark
 
+> **Superseded by [`frugal-strategy-v3.md`](./frugal-strategy-v3.md)** as of 2026-05-05.
+> The live benchmark page lives at [`docs/benchmark/index.html`](./docs/benchmark/index.html); strategy and positioning are captured in v3.
+> Kept for historical reference; do not edit.
+
+---
+
+
 ## Find the cheapest path to a good answer
 
 AI apps don’t fail because models are bad.  
