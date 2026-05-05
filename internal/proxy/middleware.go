@@ -56,7 +56,7 @@ func UseCaseFromContext(ctx context.Context) string {
 func RequestIDMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		id := strings.TrimSpace(r.Header.Get("X-Request-ID"))
-		if id == "" || len(id) > 128 {
+		if !isSafeRequestID(id) {
 			id = obs.NewRequestID()
 		}
 		w.Header().Set("X-Request-ID", id)
@@ -64,6 +64,24 @@ func RequestIDMiddleware(next http.Handler) http.Handler {
 		ctx = obs.WithLogger(ctx, obs.L(ctx).With("request_id", id))
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
+}
+
+func isSafeRequestID(id string) bool {
+	if id == "" || len(id) > 128 {
+		return false
+	}
+	for _, r := range id {
+		if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') {
+			continue
+		}
+		switch r {
+		case '-', '_', '.', ':':
+			continue
+		default:
+			return false
+		}
+	}
+	return true
 }
 
 // RateLimitMiddleware enforces a global token-bucket on the proxy's serve
