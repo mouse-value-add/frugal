@@ -5,6 +5,7 @@ import (
 	"crypto/subtle"
 	"encoding/json"
 	"net/http"
+	"regexp"
 	"runtime/debug"
 	"strings"
 	"time"
@@ -24,6 +25,8 @@ const (
 	maxFallbackHeaderEntries = 10
 	maxFallbackModelNameLen = 128
 )
+
+var useCaseHeaderPattern = regexp.MustCompile(`^[a-z0-9][a-z0-9-]{0,63}$`)
 
 // QualityFromContext extracts the quality threshold from the request context.
 func QualityFromContext(ctx context.Context) types.QualityThreshold {
@@ -215,6 +218,12 @@ func HeaderExtractionMiddleware(next http.Handler) http.Handler {
 		// Use case header is validated against the registry by the handler,
 		// not here — middleware shouldn't need the registry reference.
 		if uc := strings.TrimSpace(r.Header.Get("X-Frugal-Use-Case")); uc != "" {
+			if !useCaseHeaderPattern.MatchString(uc) {
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusBadRequest)
+				_, _ = w.Write([]byte(`{"error":{"message":"X-Frugal-Use-Case must match ^[a-z0-9][a-z0-9-]{0,63}$","type":"frugal_error","code":"invalid_use_case_header"}}`))
+				return
+			}
 			ctx = context.WithValue(ctx, useCaseKey, uc)
 		}
 
