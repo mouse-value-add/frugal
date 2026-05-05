@@ -378,7 +378,6 @@ main() {
         echo
         printf '  \033[1;32m3.\033[0m  \033[1mroute by use case\033[0m  \033[2m— the toolchain bundle that wins on the bench\033[0m\n'
         printf '        \033[1m$\033[0m curl "$OPENAI_BASE_URL/chat/completions" \\\n'
-        printf '            -H "Authorization: Bearer $OPENAI_API_KEY" \\\n'
         printf '            -H "X-Frugal-Use-Case: research-synthesis" \\\n'
         printf '            -d '\''{"model":"auto","messages":[{"role":"user","content":"hi"}]}'\''\n'
         echo
