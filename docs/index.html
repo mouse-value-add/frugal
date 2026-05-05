@@ -282,9 +282,11 @@ resp, _ := client.CreateChatCompletion(ctx, openai.ChatCompletionRequest{
 
     <section class="install-block" id="install" aria-labelledby="install-heading">
       <h2 id="install-heading">Install</h2>
-      <p class="prose">One binary, ~10 MB. Detects your API keys. Adds <code>frugal</code> to
-      your <code>PATH</code>. Release artifacts are signed with cosign; the installer
-      verifies the checksum before moving the binary into place.</p>
+      <p class="prose">One binary, ~10 MB. <strong>Frugal has no SaaS and issues no keys</strong>
+      — the proxy uses your existing <code>OPENAI_API_KEY</code>, <code>ANTHROPIC_API_KEY</code>,
+      or <code>GOOGLE_API_KEY</code> from your environment. Adds <code>frugal</code> to your
+      <code>PATH</code>. Release artifacts are signed with cosign; the installer verifies the
+      checksum before moving the binary into place.</p>
 
       <div class="terminal">
         <pre class="terminal-body"><code><span class="prompt">$</span> curl -fsSL https://frugal.sh/install | bash</code></pre>

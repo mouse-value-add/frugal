@@ -352,6 +352,9 @@ main() {
     if [ "$keys" -eq 0 ]; then
         printf '  \033[1;33m⚠\033[0m  no provider API keys detected — the proxy can'\''t make calls yet.\n'
         echo
+        printf '     \033[2mFrugal has no SaaS or account — use the keys you already have\n'
+        printf '     from your model / toolchain provider.\033[0m\n'
+        echo
         printf '  \033[2m─── \033[0m\033[1;36mSet a key to start\033[0m\033[2m ──────────────────────────────\033[0m\n'
         echo
         printf '  \033[1;32m▸\033[0m  cheapest tier  \033[2m(Gemini Flash — pennies per million tokens)\033[0m\n'
