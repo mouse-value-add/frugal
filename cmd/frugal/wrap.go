@@ -107,7 +107,7 @@ func runWrap(configPath string, args []string) int {
 	baseURL := fmt.Sprintf("http://127.0.0.1:%d/v1", port)
 
 	// Start proxy in background
-	server := &http.Server{Handler: r}
+	server := newWrapHTTPServer(r)
 	go func() {
 		if err := server.Serve(listener); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			slog.Warn("proxy serve error", "err", err)
@@ -229,6 +229,17 @@ func upsertEnv(environ []string, key, value string) []string {
 // A misconfigured HTTP proxy env var or bad DNS would otherwise stall on the
 // default client's 30s-plus timeout; cap the overall wait at ~2s so we fail
 // fast and the wrapped command never inherits a half-started proxy.
+func newWrapHTTPServer(handler http.Handler) *http.Server {
+	return &http.Server{
+		Handler:           handler,
+		ReadHeaderTimeout: envDurationOrDefault("FRUGAL_READ_HEADER_TIMEOUT", 5*time.Second),
+		ReadTimeout:       envDurationOrDefault("FRUGAL_READ_TIMEOUT", 15*time.Second),
+		WriteTimeout:      envDurationOrDefault("FRUGAL_WRITE_TIMEOUT", 120*time.Second),
+		IdleTimeout:       envDurationOrDefault("FRUGAL_IDLE_TIMEOUT", 60*time.Second),
+		MaxHeaderBytes:    envIntOrDefault("FRUGAL_MAX_HEADER_BYTES", http.DefaultMaxHeaderBytes),
+	}
+}
+
 func waitForReady(url string) error {
 	client := &http.Client{Timeout: 50 * time.Millisecond}
 	deadline := time.Now().Add(2 * time.Second)

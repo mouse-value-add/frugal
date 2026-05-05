@@ -21,6 +21,8 @@ const (
 	qualityKey  contextKey = "frugal_quality"
 	fallbackKey contextKey = "frugal_fallback"
 	useCaseKey  contextKey = "frugal_use_case"
+	maxFallbackHeaderEntries = 10
+	maxFallbackModelNameLen = 128
 )
 
 // QualityFromContext extracts the quality threshold from the request context.
@@ -181,10 +183,33 @@ func HeaderExtractionMiddleware(next http.Handler) http.Handler {
 
 		if fb := r.Header.Get("X-Frugal-Fallback"); fb != "" {
 			parts := strings.Split(fb, ",")
-			for i := range parts {
-				parts[i] = strings.TrimSpace(parts[i])
+			if len(parts) > maxFallbackHeaderEntries {
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusBadRequest)
+				_, _ = w.Write([]byte(`{"error":{"message":"X-Frugal-Fallback supports up to 10 models","type":"frugal_error","code":"invalid_fallback"}}`))
+				return
 			}
-			ctx = context.WithValue(ctx, fallbackKey, parts)
+
+			fallbacks := make([]string, 0, len(parts))
+			seen := make(map[string]struct{}, len(parts))
+			for i := range parts {
+				m := strings.TrimSpace(parts[i])
+				if m == "" {
+					continue
+				}
+				if len(m) > maxFallbackModelNameLen {
+					w.Header().Set("Content-Type", "application/json")
+					w.WriteHeader(http.StatusBadRequest)
+					_, _ = w.Write([]byte(`{"error":{"message":"X-Frugal-Fallback model names must be <= 128 characters","type":"frugal_error","code":"invalid_fallback"}}`))
+					return
+				}
+				if _, ok := seen[m]; ok {
+					continue
+				}
+				seen[m] = struct{}{}
+				fallbacks = append(fallbacks, m)
+			}
+			ctx = context.WithValue(ctx, fallbackKey, fallbacks)
 		}
 
 		// Use case header is validated against the registry by the handler,
