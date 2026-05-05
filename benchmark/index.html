@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>frugal.sh benchmark</title>
+  <style>
+    :root { --bg:#0b1020; --card:#121933; --text:#e9edff; --muted:#a9b3d9; --accent:#6ee7b7; --line:#263057; }
+    * { box-sizing:border-box; }
+    body { margin:0; font-family: Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial; background:var(--bg); color:var(--text); line-height:1.6; }
+    .wrap { max-width: 920px; margin: 0 auto; padding: 48px 20px 72px; }
+    h1,h2,h3 { line-height:1.2; margin:0 0 12px; }
+    h1 { font-size: 42px; margin-bottom: 8px; }
+    h2 { font-size: 28px; margin-top: 42px; }
+    h3 { font-size: 20px; margin-top: 26px; color: var(--accent); }
+    p { color: var(--muted); margin: 8px 0 14px; }
+    .hero p strong, .kicker { color: var(--text); }
+    ul { margin: 10px 0 18px 20px; color: var(--muted); }
+    .card { background: var(--card); border:1px solid var(--line); border-radius: 14px; padding: 18px 18px 8px; margin-top:14px; }
+    .cta { display:inline-block; background:var(--accent); color:#042019; text-decoration:none; font-weight:700; padding:12px 16px; border-radius:10px; margin-top:12px; }
+    table { width:100%; border-collapse: collapse; margin: 12px 0 8px; }
+    th,td { border:1px solid var(--line); padding:10px; text-align:left; }
+    th { color:var(--text); }
+    td { color:var(--muted); }
+    .hr { border-top:1px solid var(--line); margin:34px 0; }
+  </style>
+</head>
+<body>
+  <main class="wrap">
+    <section class="hero">
+      <div class="kicker">frugal.sh/benchmark</div>
+      <h1>Find the cheapest path to a good answer</h1>
+      <p>AI apps don’t fail because models are bad. They fail because they choose the wrong tools.</p>
+      <p>The frugal.sh benchmark measures how AI systems decide when to use search, which model to use, when to escalate, and when to do nothing at all.</p>
+      <a class="cta" href="#run">Run your first benchmark (coming soon)</a>
+    </section>
+
+    <div class="hr"></div>
+
+    <h2>What this is</h2>
+    <p>The frugal benchmark is a lightweight evaluation system for agent decision-making.</p>
+    <div class="card">
+      <ul>
+        <li><strong>Baseline:</strong> Always use the best model + search</li>
+        <li><strong>Frugal:</strong> Use the cheapest viable option, escalate only when needed</li>
+      </ul>
+      <p><strong>Question answered:</strong> Are you overpaying for your AI stack?</p>
+    </div>
+
+    <h2>Why this matters</h2>
+    <ul>
+      <li>Most teams optimize model quality, not decision quality</li>
+      <li>Overuse of expensive models and unnecessary tool calls</li>
+      <li>Higher latency and less predictable production behavior</li>
+    </ul>
+
+    <h2>What gets measured</h2>
+    <h3>1) Answer Quality</h3>
+    <ul><li>LLM-as-judge scoring</li><li>Task completion accuracy</li><li>Basic hallucination detection</li></ul>
+    <h3>2) Cost</h3>
+    <ul><li>Per-request cost</li><li>Total run cost</li><li>Cost vs baseline comparison</li></ul>
+    <h3>3) Latency</h3>
+    <ul><li>Time to first token</li><li>Total response time</li><li>Impact of tool calls</li></ul>
+    <h3>4) Tool Use Accuracy</h3>
+    <ul><li>Used search when needed?</li><li>Avoided tools when unnecessary?</li><li>Selected the right model?</li></ul>
+
+    <h2>How it works</h2>
+    <h3>Step 1: Define prompts</h3>
+    <p>Use factual, reasoning, and hybrid tasks.</p>
+    <h3>Step 2: Run strategies</h3>
+    <p>Compare baseline vs frugal router behavior.</p>
+    <h3>Step 3: Compare outcomes</h3>
+    <table>
+      <thead><tr><th>Strategy</th><th>Quality</th><th>Cost</th><th>Latency</th><th>Tool Accuracy</th></tr></thead>
+      <tbody>
+        <tr><td>Baseline</td><td>High</td><td>$$$</td><td>Slow</td><td>Medium</td></tr>
+        <tr><td>Frugal</td><td>High</td><td>$</td><td>Faster</td><td>Higher</td></tr>
+      </tbody>
+    </table>
+
+    <h2>Example insight</h2>
+    <ul>
+      <li>~40–60% of prompts did not need the best model</li>
+      <li>Search was overused in simple reasoning tasks</li>
+      <li>Routing reduced cost with minimal quality loss</li>
+    </ul>
+
+    <h2>Who this is for</h2>
+    <ul>
+      <li>Teams building AI products with APIs</li>
+      <li>Engineers building agents and tool use flows</li>
+      <li>PMs balancing cost and UX</li>
+    </ul>
+
+    <h2 id="run">Run the benchmark</h2>
+    <p>Coming soon: CLI, configurable routing strategies, exportable reports.</p>
+  </main>
+</body>
+</html>
