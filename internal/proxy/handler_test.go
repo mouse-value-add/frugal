@@ -420,7 +420,8 @@ func TestListModels(t *testing.T) {
 	var result struct {
 		Object string `json:"object"`
 		Data   []struct {
-			ID string `json:"id"`
+			ID      string `json:"id"`
+			Created int64  `json:"created"`
 		} `json:"data"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
@@ -433,6 +434,14 @@ func TestListModels(t *testing.T) {
 	// Should have mock-cheap, mock-premium, and auto
 	if len(result.Data) < 3 {
 		t.Errorf("expected at least 3 models, got %d", len(result.Data))
+	}
+	if len(result.Data) > 1 {
+		created := result.Data[0].Created
+		for i := 1; i < len(result.Data); i++ {
+			if result.Data[i].Created != created {
+				t.Fatalf("expected deterministic created timestamps across model list, got %d and %d", created, result.Data[i].Created)
+			}
+		}
 	}
 }
 

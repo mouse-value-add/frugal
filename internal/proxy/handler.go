@@ -464,6 +464,7 @@ func boundedFallbacks(ctx context.Context, fallbacks []string, selectedModel str
 // ListModels handles GET /v1/models
 func (h *Handler) ListModels(w http.ResponseWriter, r *http.Request) {
 	models := h.registry.AllModels()
+	createdAt := time.Now().Unix()
 
 	type modelObj struct {
 		ID      string `json:"id"`
@@ -477,7 +478,7 @@ func (h *Handler) ListModels(w http.ResponseWriter, r *http.Request) {
 		data = append(data, modelObj{
 			ID:      m,
 			Object:  "model",
-			Created: time.Now().Unix(),
+			Created: createdAt,
 			OwnedBy: "frugal",
 		})
 	}
@@ -485,7 +486,7 @@ func (h *Handler) ListModels(w http.ResponseWriter, r *http.Request) {
 	data = append(data, modelObj{
 		ID:      "auto",
 		Object:  "model",
-		Created: time.Now().Unix(),
+		Created: createdAt,
 		OwnedBy: "frugal",
 	})
 
