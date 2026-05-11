@@ -1,11 +1,16 @@
 package proxy
 
 import (
+	"bufio"
+	"errors"
 	"encoding/json"
+	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestRecoverMiddleware_RecoversPanic(t *testing.T) {
@@ -103,5 +108,66 @@ func TestHeaderExtractionMiddleware_AllowsValidUseCaseHeader(t *testing.T) {
 
 	if rr.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d", rr.Code)
+	}
+}
+
+type fakeConn struct{}
+
+func (fakeConn) Read([]byte) (int, error)         { return 0, io.EOF }
+func (fakeConn) Write(p []byte) (int, error)      { return len(p), nil }
+func (fakeConn) Close() error                      { return nil }
+func (fakeConn) LocalAddr() net.Addr               { return nil }
+func (fakeConn) RemoteAddr() net.Addr              { return nil }
+func (fakeConn) SetDeadline(_ time.Time) error     { return nil }
+func (fakeConn) SetReadDeadline(_ time.Time) error { return nil }
+func (fakeConn) SetWriteDeadline(_ time.Time) error { return nil }
+
+type ifaceRW struct {
+	http.ResponseWriter
+	hijacked bool
+	pushed   bool
+}
+
+func (rw *ifaceRW) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+	rw.hijacked = true
+	return fakeConn{}, bufio.NewReadWriter(bufio.NewReader(strings.NewReader("")), bufio.NewWriter(io.Discard)), nil
+}
+
+func (rw *ifaceRW) Push(_ string, _ *http.PushOptions) error {
+	rw.pushed = true
+	return nil
+}
+
+func TestStatusWriter_ForwardsOptionalInterfaces(t *testing.T) {
+	base := &ifaceRW{ResponseWriter: httptest.NewRecorder()}
+	sw := &statusWriter{ResponseWriter: base, status: http.StatusOK}
+
+	if _, _, err := sw.Hijack(); err != nil {
+		t.Fatalf("hijack failed: %v", err)
+	}
+	if !base.hijacked {
+		t.Fatalf("expected hijack to be forwarded")
+	}
+
+	if err := sw.Push("/asset.js", nil); err != nil {
+		t.Fatalf("push failed: %v", err)
+	}
+	if !base.pushed {
+		t.Fatalf("expected push to be forwarded")
+	}
+
+	if got := sw.Unwrap(); got != base {
+		t.Fatalf("expected unwrap to return wrapped writer")
+	}
+}
+
+func TestStatusWriter_UnsupportedOptionalInterfaces(t *testing.T) {
+	sw := &statusWriter{ResponseWriter: httptest.NewRecorder(), status: http.StatusOK}
+
+	if _, _, err := sw.Hijack(); !errors.Is(err, http.ErrNotSupported) {
+		t.Fatalf("expected ErrNotSupported from Hijack, got %v", err)
+	}
+	if err := sw.Push("/asset.js", nil); !errors.Is(err, http.ErrNotSupported) {
+		t.Fatalf("expected ErrNotSupported from Push, got %v", err)
 	}
 }

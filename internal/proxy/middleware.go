@@ -1,9 +1,12 @@
 package proxy
 
 import (
+	"bufio"
 	"context"
 	"crypto/subtle"
 	"encoding/json"
+	"io"
+	"net"
 	"net/http"
 	"regexp"
 	"runtime/debug"
@@ -283,9 +286,42 @@ func (sw *statusWriter) WriteHeader(code int) {
 	sw.ResponseWriter.WriteHeader(code)
 }
 
+// Ensure ReadFrom paths still update status accounting when available.
+func (sw *statusWriter) ReadFrom(r io.Reader) (int64, error) {
+	if rf, ok := sw.ResponseWriter.(io.ReaderFrom); ok {
+		if sw.status == 0 {
+			sw.status = http.StatusOK
+		}
+		return rf.ReadFrom(r)
+	}
+	return io.Copy(sw.ResponseWriter, r)
+}
+
 // Ensure statusWriter implements http.Flusher for SSE.
 func (sw *statusWriter) Flush() {
 	if f, ok := sw.ResponseWriter.(http.Flusher); ok {
 		f.Flush()
 	}
+}
+
+// Ensure statusWriter preserves optional interfaces commonly needed by
+// middleware/users of ResponseWriter wrappers.
+func (sw *statusWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+	hj, ok := sw.ResponseWriter.(http.Hijacker)
+	if !ok {
+		return nil, nil, http.ErrNotSupported
+	}
+	return hj.Hijack()
+}
+
+func (sw *statusWriter) Push(target string, opts *http.PushOptions) error {
+	p, ok := sw.ResponseWriter.(http.Pusher)
+	if !ok {
+		return http.ErrNotSupported
+	}
+	return p.Push(target, opts)
+}
+
+func (sw *statusWriter) Unwrap() http.ResponseWriter {
+	return sw.ResponseWriter
 }
