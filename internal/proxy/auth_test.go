@@ -112,3 +112,27 @@ func TestRateLimitMiddleware_RejectsOverBurst(t *testing.T) {
 		t.Fatalf("expected Retry-After header")
 	}
 }
+
+
+func TestAuthMiddleware_RejectsMultipleAuthorizationHeaders(t *testing.T) {
+	h := AuthMiddleware("secret-token")(newTestOKHandler())
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/v1/chat/completions", nil)
+	req.Header.Add("Authorization", "Bearer secret-token")
+	req.Header.Add("Authorization", "Bearer secret-token")
+	h.ServeHTTP(rec, req)
+	if rec.Code != http.StatusUnauthorized {
+		t.Fatalf("expected 401 with duplicated authorization headers, got %d", rec.Code)
+	}
+}
+
+func TestAuthMiddleware_RejectsCommaJoinedAuthorizationHeader(t *testing.T) {
+	h := AuthMiddleware("secret-token")(newTestOKHandler())
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/v1/chat/completions", nil)
+	req.Header.Set("Authorization", "Bearer secret-token, Bearer secret-token")
+	h.ServeHTTP(rec, req)
+	if rec.Code != http.StatusUnauthorized {
+		t.Fatalf("expected 401 with comma-joined authorization header, got %d", rec.Code)
+	}
+}

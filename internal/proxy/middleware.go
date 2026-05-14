@@ -133,7 +133,7 @@ func AuthMiddleware(token string) func(http.Handler) http.Handler {
 		}
 		want := []byte(token)
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			got := bearerFromHeader(r.Header.Get("Authorization"))
+			got := bearerFromAuthorizationHeaders(r.Header.Values("Authorization"))
 			if got == "" || subtle.ConstantTimeCompare([]byte(got), want) != 1 {
 				w.Header().Set("Content-Type", "application/json")
 				w.Header().Set("WWW-Authenticate", `Bearer realm="frugal"`)
@@ -150,6 +150,19 @@ func AuthMiddleware(token string) func(http.Handler) http.Handler {
 			next.ServeHTTP(w, r)
 		})
 	}
+}
+
+func bearerFromAuthorizationHeaders(vals []string) string {
+	if len(vals) != 1 {
+		return ""
+	}
+	// Reject comma-joined credentials (multiple Authorization fields collapsed by
+	// intermediaries) so a single, unambiguous bearer token is required.
+	h := strings.TrimSpace(vals[0])
+	if h == "" || strings.Contains(h, ",") {
+		return ""
+	}
+	return bearerFromHeader(h)
 }
 
 func bearerFromHeader(h string) string {
