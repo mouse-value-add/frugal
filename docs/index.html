@@ -171,37 +171,31 @@
         </table>
       </div>
       <p class="prose rack-foot">
-        Every response prints the decision: capability, provider chosen,
-        cost paid. <code>frugal route</code> previews without paying.
+        Every tool call prints the decision in the agent's tool trace:
+        capability, provider chosen, cost paid.
       </p>
     </section>
 
     <section class="surfaces" id="surfaces" aria-labelledby="surfaces-heading">
-      <p class="section-label">Surfaces</p>
-      <h2 id="surfaces-heading">MCP to ship it. CLI to try it.</h2>
+      <p class="section-label">The product</p>
+      <h2 id="surfaces-heading">One MCP server. That's it.</h2>
       <p class="prose">
         Agent stacks talk to Frugal via
-        <a href="https://modelcontextprotocol.io" rel="noopener">MCP</a>.
-        The CLI is for evaluation and the install flow itself. Same
-        routing engine underneath.
+        <a href="https://modelcontextprotocol.io" rel="noopener">MCP</a> —
+        Claude Desktop, Cursor, Claude Code, any custom MCP host. Two
+        commands; no other surface.
       </p>
       <div class="code-grid">
         <figure>
-          <figcaption>MCP — install &amp; serve</figcaption>
+          <figcaption>install into every detected agent</figcaption>
 <pre><code><span class="prompt">$</span> frugal mcp install
-<span class="muted">detected: Claude Desktop, Cursor
-✓ wrote both configs.</span>
-
-<span class="prompt">$</span> frugal mcp serve
-<span class="muted">mcp ready on stdio. tools: frugal__search</span></code></pre>
+<span class="muted">detected: Claude Desktop, Cursor, Claude Code
+✓ wrote all three configs.</span></code></pre>
         </figure>
         <figure>
-          <figcaption>CLI — run</figcaption>
-<pre><code><span class="prompt">$</span> frugal run <span class="str">"current iPhone prices"</span>
-<span class="muted">→ recipe: fresh-facts
-→ step 1: frugal__search(...)
-→ step 2: gpt-4.1-nano(results + question)
-done. cost: $0.0008</span></code></pre>
+          <figcaption>run as an MCP server</figcaption>
+<pre><code><span class="prompt">$</span> frugal mcp serve
+<span class="muted">mcp ready on stdio. tools: frugal__search</span></code></pre>
         </figure>
       </div>
     </section>

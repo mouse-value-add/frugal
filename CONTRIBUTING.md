@@ -20,15 +20,13 @@ Frugal is licensed under [BUSL 1.1](./LICENSE). By contributing, you agree your 
 ## What we're looking for
 
 - Bug fixes with regression tests
-- Provider integrations (new models, new endpoints) that fit the existing config schema
-- Benchmark reproducers — real workloads worth adding to the eval harness
+- New routed-tool providers that fit the `internal/search.Searcher` interface (or future tool interfaces)
 - Documentation improvements that tighten claims (remove hand-waves, add measurements)
 
 ## What to skip for now
 
 - Hosted control plane / multi-tenancy features
-- ML-based intent classification (the heuristic classifier is sufficient while we validate)
-- New policy knobs or routing tiers without a documented use case
+- Anything that adds a CLI verb (v1.0 deliberately ships only `mcp install` / `mcp serve`)
 
 ## Reporting security issues
 

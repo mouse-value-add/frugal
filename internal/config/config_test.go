@@ -3,181 +3,81 @@ package config
 import (
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 )
 
-func TestLoad_ValidConfig(t *testing.T) {
-	content := `
-providers:
-  openai:
-    api_key_env: OPENAI_API_KEY
-    base_url: https://api.openai.com/v1
-    models:
-      gpt-4o:
-        cost_per_1k_input: 0.0025
-        cost_per_1k_output: 0.01
-        capabilities:
-          reasoning: 0.95
-          coding: 0.92
-          creative: 0.90
-          instruction_following: 0.95
-          tool_use: true
-          json_mode: true
-          max_context: 128000
-quality_thresholds:
-  balanced:
-    min_reasoning: 0.70
-    min_coding: 0.68
-    min_creative: 0.65
-    min_instruction_following: 0.72
-`
-	dir := t.TempDir()
-	path := filepath.Join(dir, "config.yaml")
-	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
-		t.Fatal(err)
+func TestLoad_StarterModelsYAMLLoads(t *testing.T) {
+	// The in-tree starter config should parse cleanly with no unknown fields.
+	// Clear FRUGAL_CONFIG so a stale installer-side config doesn't override
+	// the in-tree path under test.
+	t.Setenv("FRUGAL_CONFIG", "")
+	path := filepath.Join("..", "..", "config", "models.yaml")
+	if _, err := os.Stat(path); err != nil {
+		t.Skipf("starter models.yaml not present: %v", err)
 	}
-
 	cfg, err := Load(path)
 	if err != nil {
-		t.Fatalf("Load() error: %v", err)
+		t.Fatalf("Load: %v", err)
 	}
-
-	if len(cfg.Providers) != 1 {
-		t.Errorf("expected 1 provider, got %d", len(cfg.Providers))
+	if _, ok := cfg.SearchProviders["tavily"]; !ok {
+		t.Errorf("expected 'tavily' in SearchProviders, got %+v", cfg.SearchProviders)
 	}
-
-	openai := cfg.Providers["openai"]
-	if openai.APIKeyEnv != "OPENAI_API_KEY" {
-		t.Errorf("expected OPENAI_API_KEY, got %s", openai.APIKeyEnv)
-	}
-
-	gpt4o := openai.Models["gpt-4o"]
-	if gpt4o.CostPer1KInput != 0.0025 {
-		t.Errorf("expected 0.0025, got %f", gpt4o.CostPer1KInput)
-	}
-	if gpt4o.Capabilities.Reasoning != 0.95 {
-		t.Errorf("expected reasoning 0.95, got %f", gpt4o.Capabilities.Reasoning)
-	}
-	if !gpt4o.Capabilities.ToolUse {
-		t.Error("expected tool_use=true")
-	}
-	if gpt4o.Capabilities.MaxContext != 128000 {
-		t.Errorf("expected max_context 128000, got %d", gpt4o.Capabilities.MaxContext)
-	}
-
-	balanced := cfg.QualityThresholds["balanced"]
-	if balanced.MinReasoning != 0.70 {
-		t.Errorf("expected min_reasoning 0.70, got %f", balanced.MinReasoning)
+	if _, ok := cfg.SearchProviders["serper"]; !ok {
+		t.Errorf("expected 'serper' in SearchProviders, got %+v", cfg.SearchProviders)
 	}
 }
 
 func TestLoad_MissingFile(t *testing.T) {
-	_, err := Load("/nonexistent/path/config.yaml")
-	if err == nil {
-		t.Error("expected error for missing file")
+	t.Setenv("FRUGAL_CONFIG", "")
+	if _, err := Load("/does/not/exist.yaml"); err == nil {
+		t.Fatalf("expected error for missing file")
 	}
 }
 
-func TestLoad_RejectsNegativeCosts(t *testing.T) {
-	content := `
-providers:
-  openai:
-    api_key_env: OPENAI_API_KEY
-    models:
-      gpt-4o:
-        cost_per_1k_input: -0.01
-        cost_per_1k_output: 0.01
-        capabilities:
-          reasoning: 0.95
-          coding: 0.92
-          creative: 0.90
-          instruction_following: 0.95
-          max_context: 128000
-`
+func TestValidate_RejectsNegativeCost(t *testing.T) {
 	dir := t.TempDir()
-	path := filepath.Join(dir, "config.yaml")
-	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
+	path := filepath.Join(dir, "cfg.yaml")
+	yaml := `search_providers:
+  bad:
+    api_key_env: X
+    cost_per_call: -0.01
+`
+	if err := os.WriteFile(path, []byte(yaml), 0o644); err != nil {
 		t.Fatal(err)
 	}
-
-	_, err := Load(path)
-	if err == nil {
-		t.Fatal("expected error for negative cost")
-	}
-	if !strings.Contains(err.Error(), "costs must be non-negative") {
-		t.Fatalf("expected non-negative costs error, got: %v", err)
+	if _, err := Load(path); err == nil {
+		t.Fatalf("expected validation error for negative cost_per_call")
 	}
 }
 
-func TestLoad_RejectsOutOfRangeCapabilityScore(t *testing.T) {
-	content := `
-providers:
-  openai:
-    api_key_env: OPENAI_API_KEY
-    models:
-      gpt-4o:
-        cost_per_1k_input: 0.0025
-        cost_per_1k_output: 0.01
-        capabilities:
-          reasoning: 1.2
-          coding: 0.92
-          creative: 0.90
-          instruction_following: 0.95
-          max_context: 128000
-`
+func TestValidate_RejectsMissingAPIKeyEnv(t *testing.T) {
 	dir := t.TempDir()
-	path := filepath.Join(dir, "config.yaml")
-	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
+	path := filepath.Join(dir, "cfg.yaml")
+	yaml := `search_providers:
+  bad:
+    cost_per_call: 0.001
+`
+	if err := os.WriteFile(path, []byte(yaml), 0o644); err != nil {
 		t.Fatal(err)
 	}
-
-	_, err := Load(path)
-	if err == nil {
-		t.Fatal("expected error for out-of-range capability")
-	}
-	if !strings.Contains(err.Error(), "capabilities.reasoning") {
-		t.Fatalf("expected capabilities.reasoning error, got: %v", err)
+	if _, err := Load(path); err == nil {
+		t.Fatalf("expected validation error for missing api_key_env")
 	}
 }
 
-func TestLoad_RejectsUnknownFields(t *testing.T) {
-	content := `
-providers:
-  openai:
-    api_key_env: OPENAI_API_KEY
-    base_url: https://api.openai.com/v1
-    models:
-      gpt-4o:
-        cost_per_1k_input: 0.0025
-        cost_per_1k_output: 0.01
-        capabilities:
-          reasoning: 0.95
-          coding: 0.92
-          creative: 0.90
-          instruction_following: 0.95
-          tool_use: true
-          json_mode: true
-          max_context: 128000
-          typo_field: true
-quality_thresholds:
-  balanced:
-    min_reasoning: 0.70
-    min_coding: 0.68
-    min_creative: 0.65
-    min_instruction_following: 0.72
-`
+func TestLoad_RejectsUnknownTopLevelField(t *testing.T) {
 	dir := t.TempDir()
-	path := filepath.Join(dir, "config.yaml")
-	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
+	path := filepath.Join(dir, "cfg.yaml")
+	yaml := `search_providers:
+  serper:
+    api_key_env: X
+    cost_per_call: 0.001
+mystery_field: oops
+`
+	if err := os.WriteFile(path, []byte(yaml), 0o644); err != nil {
 		t.Fatal(err)
 	}
-
-	_, err := Load(path)
-	if err == nil {
-		t.Fatal("expected error for unknown field")
-	}
-	if !strings.Contains(err.Error(), "typo_field") {
-		t.Fatalf("expected unknown field error to mention typo_field, got: %v", err)
+	if _, err := Load(path); err == nil {
+		t.Fatalf("expected error for unknown top-level field")
 	}
 }

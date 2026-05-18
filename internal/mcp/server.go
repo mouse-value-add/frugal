@@ -9,8 +9,7 @@
 // returns no entries). PR 4 registers frugal__search. The scaffold is
 // validated against a real client via NewInMemoryTransports in tests.
 //
-// See frugal-strategy-v6.md §7 for the product-surface framing and §8 for
-// the component-status matrix that says which tools have shipped.
+// See STRATEGY.md for the product positioning and component-status matrix.
 package mcp
 
 import (
