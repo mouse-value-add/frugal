@@ -3,21 +3,21 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>frugal — stop overpaying for AI tasks</title>
-  <meta name="description" content="Open-source AI toolchain cost optimizer for local-first builders. CLI + MCP server that routes each task to the cheapest reliable toolchain — local models, hosted models, search, browser, code execution, or cache. No account. BYOK." />
+  <title>frugal — most AI tasks are over-routed</title>
+  <meta name="description" content="Most AI tasks are over-routed. Frugal is a CLI and MCP server that routes each one through the cheapest reliable path — local model, hosted model, search, browser, or cache. Open source. BYOK. One Go binary." />
   <meta name="theme-color" content="#0a0a0b" media="(prefers-color-scheme: dark)" />
   <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)" />
   <meta name="color-scheme" content="dark light" />
 
   <meta property="og:type" content="website" />
   <meta property="og:url" content="https://frugal.sh/" />
-  <meta property="og:title" content="frugal — stop overpaying for AI tasks" />
-  <meta property="og:description" content="Open-source AI toolchain cost optimizer for local-first builders. CLI + MCP server that routes each task to the cheapest reliable toolchain. No account. BYOK." />
+  <meta property="og:title" content="frugal — most AI tasks are over-routed" />
+  <meta property="og:description" content="A CLI and MCP server that routes each task through the cheapest reliable path — local model, hosted model, search, browser, or cache. Open source. BYOK." />
   <meta property="og:site_name" content="frugal.sh" />
 
   <meta name="twitter:card" content="summary_large_image" />
-  <meta name="twitter:title" content="frugal — stop overpaying for AI tasks" />
-  <meta name="twitter:description" content="Open-source AI toolchain cost optimizer for local-first builders. CLI + MCP server that routes work, not just models. No account. BYOK." />
+  <meta name="twitter:title" content="frugal — most AI tasks are over-routed" />
+  <meta name="twitter:description" content="A CLI and MCP server that routes each AI task through the cheapest reliable path. Open source. BYOK. One Go binary." />
 
   <link rel="canonical" href="https://frugal.sh/" />
   <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
@@ -42,28 +42,26 @@
       <span class="brand-name">frugal</span>
     </a>
     <nav class="top-nav" aria-label="Primary">
-      <a href="#how">How it works</a>
+      <a href="#recipes">Recipes</a>
       <a href="#surfaces">CLI &amp; MCP</a>
       <a href="#install">Install</a>
-      <a href="/benchmark/">Benchmark</a>
       <a href="https://github.com/brainsparker/frugal" rel="noopener">GitHub</a>
     </nav>
   </header>
 
   <main id="main">
     <section class="hero">
-      <p class="eyebrow" aria-hidden="true">open-source · toolchain cost optimizer · for local-first AI builders</p>
+      <p class="eyebrow" aria-hidden="true">open-source · for local-first AI builders</p>
       <h1>
-        Stop overpaying for AI tasks. Frugal routes each request to the
-        <span class="accent">cheapest reliable toolchain</span> — local models,
-        hosted models, search, browser tools, code execution, or cache.
+        Most AI tasks are over-routed.
+        Frugal picks the <span class="accent">cheaper path.</span>
       </h1>
       <p class="lede">
-        Most AI tasks are over-routed. Frontier model when local-plus-search
-        would have worked. Long-context when retrieval would have. Agent loops
-        when one tool call would have. Frugal picks the cheaper,
-        equally-correct path — through a CLI you can call directly and an MCP
-        server your agent stack can install.
+        Frontier models for fresh facts. Long context for one-line answers.
+        Agent loops for single tool calls. Frugal routes each task through
+        the cheapest reliable path — local model, hosted model, search,
+        browser, code exec, or cache. A CLI you call, or an MCP server your
+        agent installs. One Go binary. Your keys. No account.
       </p>
 
       <div class="terminal" aria-label="Install command">
@@ -107,46 +105,41 @@ tool 'frugal__search' now available in your agent stack.</span></code></pre>
     </section>
 
     <section class="why" aria-labelledby="why-heading">
-      <h2 id="why-heading">The insight</h2>
+      <h2 id="why-heading">How Frugal decides</h2>
       <p class="prose">
-        Most AI tasks are over-routed. You're paying for capability you don't
-        use on <strong>60–80% of your calls</strong> — and when you <em>do</em>
-        need capability, a bare chat model is rarely the answer. The expensive
-        part isn't the model. It's the wrong path: a frontier API when a local
-        model plus search would have worked, long-context when retrieval would
-        have, an agent loop when one tool call would have. Frugal classifies
-        each request and routes to the cheapest reliable toolchain that clears
-        the quality bar.
+        The expensive part of AI isn't the model. It's the wrong path —
+        and the right path changes every request. Frugal makes the
+        decision for you, with the actual cost in every response.
       </p>
       <dl class="grid">
         <div>
-          <dt>Toolchain classifier</dt>
-          <dd>Detects the task and the capabilities required — local model,
+          <dt>Classify</dt>
+          <dd>Detect the task and the capabilities required — local model,
           hosted model, search, browser, code execution, extraction,
           embeddings, semantic cache, or a multi-step combination.</dd>
         </div>
         <div>
-          <dt>Cheapest-path router</dt>
-          <dd>Per task and quality tier, picks the cheapest reliable toolchain
-          that clears every threshold. One runtime, one routing decision,
-          shared between CLI and MCP server.</dd>
+          <dt>Route</dt>
+          <dd>Pick the cheapest path that clears every quality threshold.
+          One routing engine, shared by the CLI and the MCP server, so
+          agents and scripts get the same answer.</dd>
         </div>
         <div>
-          <dt>Eval as source of truth</dt>
-          <dd>Use-case benchmarks decide which toolchains win. Routing isn't
-          opinion — it's what the data says wins for your workload, rerun on
-          every release.</dd>
+          <dt>Audit</dt>
+          <dd>Every response prints the decision — recipe, step list,
+          model picks, actual cost. <code>frugal route</code> previews
+          without paying.</dd>
         </div>
       </dl>
     </section>
 
-    <section class="recipes" aria-labelledby="recipes-heading">
-      <h2 id="recipes-heading">Recipes — common tasks, cheapest reliable paths</h2>
+    <section class="recipes" id="recipes" aria-labelledby="recipes-heading">
+      <h2 id="recipes-heading">The recipe table</h2>
       <p class="prose">
-        Each row is the cheapest reliable default Frugal aims to route. Status
-        tags are honest: <strong>Shipping</strong> routes live traffic today,
-        <strong>Stubbed</strong> means the schema slot exists so caller code
-        won't break when it lands, <strong>Planned</strong> is on the roadmap.
+        Eight common tasks. The cheapest reliable path for each. Status
+        is literal: <strong>Shipping</strong> routes live traffic today;
+        <strong>Partial</strong> ships a meaningful slice; <strong>Planned</strong>
+        is roadmap.
       </p>
       <div class="recipe-table-wrap">
         <table class="recipe-table">
@@ -166,43 +159,40 @@ tool 'frugal__search' now available in your agent stack.</span></code></pre>
         </table>
       </div>
       <p class="prose recipes-foot">
-        Five recipes ship today as named use cases —
+        Five recipes ship today: <code>fresh-facts</code>,
         <code>research-synthesis</code>, <code>code-dev</code>,
-        <code>factual-qa</code>, <code>structured-extraction</code>,
-        and <code>fresh-facts</code>.
-        <a href="https://github.com/brainsparker/frugal#recipes--common-tasks-cheapest-reliable-paths" rel="noopener">See all recipes in the README →</a>
+        <code>factual-qa</code>, <code>structured-extraction</code>.
+        <a href="https://github.com/brainsparker/frugal#recipes--common-tasks-cheapest-reliable-paths" rel="noopener">Full reference in the README →</a>
       </p>
     </section>
 
     <section class="how" id="how" aria-labelledby="how-heading">
-      <h2 id="how-heading">How it works</h2>
+      <h2 id="how-heading">One run, end to end</h2>
 <pre class="diagram" aria-label="Flow diagram">frugal run "summarize this repo"
        │
-       ├─ classifies task → recipe ID + quality tier
-       ├─ loads recipe step list from config/use_cases/&lt;id&gt;.yaml
+       ├─ classify task → recipe ID + quality tier
+       ├─ load recipe steps from config/use_cases/&lt;id&gt;.yaml
        ├─ for each step:
-       │     ├─ tool step  → call MCP tool (loopback) → routed provider → result
-       │     └─ chat step  → router picks cheapest model meeting threshold
-       ├─ binds {task}, {step1.results}, … into subsequent step inputs
-       └─ prints final result + cost + recipe path</pre>
+       │     ├─ tool  → call MCP tool (loopback) → routed provider
+       │     └─ chat  → router picks cheapest model that clears the threshold
+       ├─ bind {task}, {step1.results}, … into subsequent step inputs
+       └─ print result, cost, and recipe path</pre>
       <p class="prose">
-        Same recipe runs whether invoked via the CLI (<code>frugal run</code>)
-        or via an MCP client calling a tool like <code>frugal__chat</code>
-        with the matching use-case hint. The router, eval scoring, and
-        pricing data are shared between both surfaces.
+        Same engine whether you type <code>frugal run</code> or your agent
+        calls <code>frugal__search</code> via MCP. One routing decision,
+        two surfaces.
       </p>
     </section>
 
     <section class="surfaces" id="surfaces" aria-labelledby="surfaces-heading">
-      <h2 id="surfaces-heading">Two surfaces, one router</h2>
+      <h2 id="surfaces-heading">CLI for humans. MCP for agents.</h2>
       <p class="prose">
-        The <strong>CLI</strong> is for scripts, humans, CI, Makefiles, and
-        ad-hoc tasks. The <strong>MCP server</strong> is for agents that
-        already speak the
+        The <strong>CLI</strong> is for scripts, CI, and ad-hoc tasks. The
+        <strong>MCP server</strong> is for agent stacks that speak the
         <a href="https://modelcontextprotocol.io" rel="noopener">Model Context Protocol</a>
-        — Claude Code, Claude Desktop, Cursor, custom hosts. Same routing
-        engine underneath; agents call it via MCP, humans and scripts call
-        it via CLI.
+        — Claude Code, Cursor, Claude Desktop, custom hosts. Same router
+        underneath. <code>frugal mcp install</code> writes the right
+        config into every detected agent in one command.
       </p>
       <div class="code-grid">
         <figure>
@@ -241,9 +231,10 @@ baseline: gpt-4o      → $0.0182 → pass
     </section>
 
     <section class="quality" aria-labelledby="quality-heading">
-      <h2 id="quality-heading">Three quality tiers — pick per invocation</h2>
-      <p class="prose">Pass <code>--quality cost</code> for a quick extraction.
-      <code>--quality high</code> for your agent's planner step. Default <code>balanced</code> for everything else.</p>
+      <h2 id="quality-heading">Three tiers. Pick per call.</h2>
+      <p class="prose"><code>--quality cost</code> for extractions and lookups.
+      <code>--quality high</code> for planners and novel code. Default
+      <code>balanced</code> for everything else.</p>
       <div class="tiers">
         <article class="tier">
           <h3>high</h3>
@@ -264,31 +255,17 @@ baseline: gpt-4o      → $0.0182 → pass
     </section>
 
     <section class="providers" aria-labelledby="providers-heading">
-      <h2 id="providers-heading">What routes today</h2>
-      <p class="prose">Model pricing synced from <a href="https://models.dev" rel="noopener">models.dev</a> on every startup.
-      Extend by editing <code>~/.frugal/config/models.yaml</code>. Each toolchain
-      component below ships only when the eval harness has data saying a
-      toolchain built around it clears the quality bar.</p>
-
-      <h3 class="provider-subhead">Model providers</h3>
-      <div class="provider-grid">
-        <div class="provider">
-          <h3>OpenAI</h3>
-          <p>GPT-4o · GPT-4o-mini · GPT-4.1 · GPT-4.1-mini · GPT-4.1-nano</p>
-        </div>
-        <div class="provider">
-          <h3>Anthropic</h3>
-          <p>Claude Opus 4 · Claude Sonnet 4 · Claude Haiku 3.5</p>
-        </div>
-        <div class="provider">
-          <h3>Google</h3>
-          <p>Gemini 2.5 Pro · Gemini 2.5 Flash · Gemini 2.0 Flash</p>
-        </div>
-      </div>
-
-      <h3 class="provider-subhead">Toolchain components</h3>
+      <h2 id="providers-heading">Toolchain components</h2>
+      <p class="prose">
+        Hosted chat from OpenAI, Anthropic, Google. Routed search via
+        Tavily and Serper. Pricing synced from
+        <a href="https://models.dev" rel="noopener">models.dev</a> at
+        startup; extend by editing <code>~/.frugal/config/models.yaml</code>.
+        Each component below ships only when the eval has data saying a
+        toolchain built around it clears the quality bar.
+      </p>
       <p class="prose component-legend">
-        <strong>Shipping</strong> — routes live traffic today.
+        <strong>Shipping</strong> — routes live traffic.
         <strong>Stubbed</strong> — schema slot exists; no executor wired.
         <strong>Planned</strong> — on the roadmap.
       </p>
@@ -328,47 +305,17 @@ baseline: gpt-4o      → $0.0182 → pass
       </div>
     </section>
 
-    <section class="usecases" aria-labelledby="usecases-heading">
-      <h2 id="usecases-heading">Recipes that ship today</h2>
-      <p class="prose">
-        Each recipe is a deterministic step list in
-        <code>config/use_cases/&lt;id&gt;.yaml</code> with three quality tiers
-        and a labeled benchmark workload. The classifier picks one per
-        invocation; the executor runs it; the result includes the recipe ID
-        and the actual cost paid so you can audit the routing decision.
-      </p>
-      <div class="provider-grid">
-        <div class="provider">
-          <h3>fresh-facts</h3>
-          <p>Time-sensitive questions: today's news, current prices, this week's scores. Routes <code>frugal__search</code> + small chat synthesis.</p>
-        </div>
-        <div class="provider">
-          <h3>research-synthesis</h3>
-          <p>Long-form multi-source research. Chat today; rerank lands Phase 2.</p>
-        </div>
-        <div class="provider">
-          <h3>code-dev</h3>
-          <p>Code generation, debugging, review. Hosted chat now; local-model fallback in Phase 3.</p>
-        </div>
-        <div class="provider">
-          <h3>factual-qa</h3>
-          <p>Short factual lookups, trivia. Cheapest mini-tier model on the benchmark wins.</p>
-        </div>
-        <div class="provider">
-          <h3>structured-extraction</h3>
-          <p>Free text → JSON. Smallest JSON-mode-reliable model that passes the schema.</p>
-        </div>
-      </div>
-    </section>
-
     <section class="install-block" id="install" aria-labelledby="install-heading">
       <h2 id="install-heading">Install</h2>
-      <p class="prose">One binary, ~10 MB. <strong>Frugal has no SaaS and issues no keys</strong>
-      — it uses your existing <code>OPENAI_API_KEY</code>, <code>ANTHROPIC_API_KEY</code>,
-      <code>GOOGLE_API_KEY</code>, <code>TAVILY_API_KEY</code>, <code>SERPER_API_KEY</code>
-      from your environment. Adds <code>frugal</code> to your <code>PATH</code>.
-      Release artifacts are signed with cosign; the installer verifies the checksum
-      before moving the binary into place.</p>
+      <p class="prose">
+        One Go binary, ~10 MB. <strong>No SaaS. No account.</strong>
+        BYOK — Frugal reads <code>OPENAI_API_KEY</code>,
+        <code>ANTHROPIC_API_KEY</code>, <code>GOOGLE_API_KEY</code>,
+        <code>TAVILY_API_KEY</code>, <code>SERPER_API_KEY</code> from
+        your environment and forwards calls upstream. Releases are
+        cosign-signed; the installer verifies the checksum before
+        moving the binary into place.
+      </p>
 
       <div class="terminal">
         <pre class="terminal-body"><code><span class="prompt">$</span> curl -fsSL https://frugal.sh/install | bash</code></pre>
@@ -380,19 +327,18 @@ baseline: gpt-4o      → $0.0182 → pass
         <pre class="terminal-body"><code><span class="prompt">$</span> git clone https://github.com/brainsparker/frugal.git &amp;&amp; cd frugal &amp;&amp; make build</code></pre>
       </div>
 
-      <h3>Install as an MCP server in your agent stack</h3>
+      <h3>Add Frugal to your agent</h3>
       <div class="terminal compact">
         <pre class="terminal-body"><code><span class="prompt">$</span> frugal mcp install
-<span class="muted"># auto-detects Claude Desktop, Cursor, Claude Code and merges the
-# 'frugal' MCP server into each detected config. Idempotent.</span></code></pre>
+<span class="muted"># auto-detects Claude Desktop, Cursor, Claude Code.
+# merges 'frugal' into each detected config. idempotent.</span></code></pre>
       </div>
 
       <p class="fine">
-        Migrating from v0.x? The OpenAI-compatible HTTP proxy and command-wrap
-        mode were removed in v1.0 — see the
-        <a href="https://github.com/brainsparker/frugal/blob/main/frugal-strategy-v5.md#10-v10-breaking-change" rel="noopener">v1.0 breaking-change note</a>
-        for the migration path. Pin <code>FRUGAL_VERSION=v0.2.x</code> in the
-        installer to stay on v0.x if you need the legacy proxy.
+        Migrating from v0.x? The OpenAI-compatible HTTP proxy and
+        command-wrap mode were removed in v1.0 — see the
+        <a href="https://github.com/brainsparker/frugal/blob/main/frugal-strategy-v5.md#10-v10-breaking-change" rel="noopener">migration note</a>.
+        Pin <code>FRUGAL_VERSION=v0.2.x</code> to stay on the legacy proxy.
       </p>
     </section>
 
@@ -401,27 +347,28 @@ baseline: gpt-4o      → $0.0182 → pass
       <dl class="grid grid-trust">
         <div>
           <dt>Your keys stay local</dt>
-          <dd>Provider API keys never leave your machine. Frugal reads them from the
-          environment and forwards requests upstream; there is no control plane.
-          Enterprise customers extend the same model to the analytics tier — self-hosted
-          dashboard, <strong>zero data retention by architecture</strong>.</dd>
+          <dd>Provider API keys never leave your machine. No control
+          plane. Enterprise customers extend the same model to the
+          analytics tier — self-hosted dashboard,
+          <strong>zero data retention by architecture</strong>.</dd>
         </div>
         <div>
           <dt>Signed releases</dt>
-          <dd>Every binary is cosign-signed (keyless, GitHub OIDC). The installer
-          verifies the checksum and, when <code>cosign</code> is present, the signature
-          before executing anything.</dd>
+          <dd>Every binary is cosign-signed (keyless, GitHub OIDC).
+          The installer verifies the checksum and, when
+          <code>cosign</code> is present, the signature.</dd>
         </div>
         <div>
-          <dt>Observable by default</dt>
-          <dd>Structured logs, every recipe run prints its routing decision —
-          recipe ID, step list, model picks, and the actual cost paid.
-          <code>frugal route</code> previews the decision without executing.</dd>
+          <dt>Auditable routing</dt>
+          <dd>Every response prints the decision: recipe, step list,
+          model picks, actual cost paid.
+          <code>frugal route</code> previews without paying. Structured
+          logs throughout.</dd>
         </div>
         <div>
-          <dt>Source-available, BUSL 1.1</dt>
-          <dd>Self-hosted and internal commercial use is permitted. Each version
-          converts to Apache 2.0 four years after release.</dd>
+          <dt>BUSL 1.1, converts to Apache 2.0</dt>
+          <dd>Self-hosting and internal commercial use are permitted.
+          Apache 2.0 four years after each release.</dd>
         </div>
       </dl>
     </section>

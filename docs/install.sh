@@ -369,8 +369,6 @@ main() {
         echo
         printf '  Then try it:\n'
         printf '        \033[1m$\033[0m frugal run "summarize this README"\n'
-        echo
-        printf '  \033[2mNot sure yet?  See the live benchmark →\033[0m \033[1;36mhttps://frugal.sh/benchmark\033[0m\n'
     else
         printf '  \033[2m─── \033[0m\033[1;36mTry it\033[0m\033[2m ──────────────────────────────────────────\033[0m\n'
         echo
@@ -383,9 +381,8 @@ main() {
         printf '  \033[1;32m3.\033[0m  \033[1minstall as an MCP server\033[0m  \033[2m(Claude Desktop / Cursor / Claude Code)\033[0m\n'
         printf '        \033[1m$\033[0m frugal mcp install\n'
         echo
-        printf '  \033[1;32m4.\033[0m  \033[1msee what frugal saved\033[0m\n'
+        printf '  \033[1;32m4.\033[0m  \033[1msee what frugal saved\033[0m  \033[2m(real provider bytes, scored locally)\033[0m\n'
         printf '        \033[1m$\033[0m frugal bench --out BENCHMARKS.md\n'
-        printf '        \033[2mor read the live run →\033[0m \033[1;36mhttps://frugal.sh/benchmark\033[0m\n'
     fi
 
     echo
