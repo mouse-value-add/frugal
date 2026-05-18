@@ -3,21 +3,21 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>frugal — most AI tasks are over-routed</title>
-  <meta name="description" content="Most AI tasks are over-routed. Frugal is a CLI and MCP server that routes each one through the cheapest reliable path — local model, hosted model, search, browser, or cache. Open source. BYOK. One Go binary." />
+  <title>frugal — an AI toolchain router for your agents</title>
+  <meta name="description" content="Frugal routes each AI task through the cheapest reliable path — search, chat, browser, code exec, or cache — exposed to Claude Code, Cursor, and Claude Desktop as MCP tools. One signed Go binary. BYOK. Source-available (BUSL 1.1 → Apache 2.0)." />
   <meta name="theme-color" content="#0a0a0b" media="(prefers-color-scheme: dark)" />
   <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)" />
   <meta name="color-scheme" content="dark light" />
 
   <meta property="og:type" content="website" />
   <meta property="og:url" content="https://frugal.sh/" />
-  <meta property="og:title" content="frugal — most AI tasks are over-routed" />
-  <meta property="og:description" content="A CLI and MCP server that routes each task through the cheapest reliable path — local model, hosted model, search, browser, or cache. Open source. BYOK." />
+  <meta property="og:title" content="frugal — an AI toolchain router for your agents" />
+  <meta property="og:description" content="Routes each AI task through the cheapest reliable path — search, chat, browser, code exec, cache — exposed to Claude Code, Cursor, Claude Desktop as MCP tools. BYOK. One Go binary." />
   <meta property="og:site_name" content="frugal.sh" />
 
   <meta name="twitter:card" content="summary_large_image" />
-  <meta name="twitter:title" content="frugal — most AI tasks are over-routed" />
-  <meta name="twitter:description" content="A CLI and MCP server that routes each AI task through the cheapest reliable path. Open source. BYOK. One Go binary." />
+  <meta name="twitter:title" content="frugal — an AI toolchain router for your agents" />
+  <meta name="twitter:description" content="Cheapest reliable path per AI task, exposed to your agent stack as MCP tools. BYOK. One Go binary." />
 
   <link rel="canonical" href="https://frugal.sh/" />
   <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
@@ -51,17 +51,23 @@
 
   <main id="main">
     <section class="hero">
-      <p class="eyebrow" aria-hidden="true">open-source · for local-first AI builders</p>
+      <p class="eyebrow" aria-hidden="true">source-available · BUSL 1.1 → Apache 2.0 · BYOK</p>
+
+      <pre class="hero-catalog" aria-label="Recipe catalog">fresh-facts           · search + small hosted model
+research-synthesis    · long-context reasoner
+code-dev              · routed coder model
+factual-qa            · cheapest mini-tier model
+structured-extraction · cheapest JSON-mode model</pre>
+
       <h1>
-        Most AI tasks are over-routed.
-        Frugal picks the <span class="accent">cheaper path.</span>
+        An AI toolchain router for your
+        <span class="accent">agents.</span>
       </h1>
       <p class="lede">
-        Frontier models for fresh facts. Long context for one-line answers.
-        Agent loops for single tool calls. Frugal routes each task through
-        the cheapest reliable path — local model, hosted model, search,
-        browser, code exec, or cache. A CLI you call, or an MCP server your
-        agent installs. One Go binary. Your keys. No account.
+        Frugal routes each task through the cheapest reliable path —
+        search, chat, browser, code exec, or cache — exposed to your
+        agent stack as <code>frugal__*</code> tools over MCP (the Model
+        Context Protocol). One signed Go binary. Your keys. No account.
       </p>
 
       <div class="terminal" aria-label="Install command">
@@ -73,22 +79,25 @@
         <button class="copy" type="button" data-copy="curl -fsSL https://frugal.sh/install | bash" aria-label="Copy install command">Copy</button>
       </div>
 
-      <div class="terminal secondary" aria-label="frugal run example">
-        <pre class="terminal-body"><code><span class="prompt">$</span> frugal run <span class="str">"current iPhone prices"</span>
-<span class="muted">→ recipe: fresh-facts
-→ step 1: frugal__search(...)
-→ step 2: gpt-4.1-nano(search results + question)
-done. cost: $0.0008</span></code></pre>
-        <button class="copy" type="button" data-copy='frugal run "current iPhone prices"' aria-label="Copy run example">Copy</button>
-      </div>
-
-      <div class="terminal secondary" aria-label="frugal mcp install example">
+      <div class="terminal secondary" aria-label="Install Frugal into your agent stack">
         <pre class="terminal-body"><code><span class="prompt">$</span> frugal mcp install
 <span class="muted">detected: Claude Desktop, Cursor
-✓ wrote ~/Library/Application Support/Claude/claude_desktop_config.json
-✓ wrote ~/.cursor/mcp.json
-tool 'frugal__search' now available in your agent stack.</span></code></pre>
+✓ wrote both configs.</span>
+
+<span class="muted"># Then, in Claude Code:
+# &gt; current iPhone prices?
+#   ↳ frugal__search routed to serper @ $0.0003
+#   ↳ gpt-4.1-nano synthesizes the result
+# done. cost: $0.0008</span></code></pre>
         <button class="copy" type="button" data-copy="frugal mcp install" aria-label="Copy install example">Copy</button>
+      </div>
+
+      <div class="terminal secondary" aria-label="Or, from a script">
+        <pre class="terminal-body"><code><span class="muted"># Or, drive it from a script:</span>
+<span class="prompt">$</span> frugal run <span class="str">"current iPhone prices"</span>
+<span class="muted">→ recipe: fresh-facts
+done. cost: $0.0008</span></code></pre>
+        <button class="copy" type="button" data-copy='frugal run "current iPhone prices"' aria-label="Copy run example">Copy</button>
       </div>
 
       <div class="pills" role="list">
@@ -99,8 +108,8 @@ tool 'frugal__search' now available in your agent stack.</span></code></pre>
       </div>
 
       <div class="cta">
-        <a class="btn btn-primary" href="https://github.com/brainsparker/frugal" rel="noopener">View on GitHub</a>
-        <a class="btn btn-ghost" href="#surfaces">See it in action →</a>
+        <a class="btn btn-primary" href="#install">Install in your agent →</a>
+        <a class="btn btn-ghost" href="https://github.com/brainsparker/frugal" rel="noopener">View on GitHub</a>
       </div>
     </section>
 
@@ -185,14 +194,14 @@ tool 'frugal__search' now available in your agent stack.</span></code></pre>
     </section>
 
     <section class="surfaces" id="surfaces" aria-labelledby="surfaces-heading">
-      <h2 id="surfaces-heading">CLI for humans. MCP for agents.</h2>
+      <h2 id="surfaces-heading">MCP to ship it. CLI to try it.</h2>
       <p class="prose">
-        The <strong>CLI</strong> is for scripts, CI, and ad-hoc tasks. The
-        <strong>MCP server</strong> is for agent stacks that speak the
-        <a href="https://modelcontextprotocol.io" rel="noopener">Model Context Protocol</a>
-        — Claude Code, Cursor, Claude Desktop, custom hosts. Same router
-        underneath. <code>frugal mcp install</code> writes the right
-        config into every detected agent in one command.
+        Agent stacks — Claude Code, Cursor, Claude Desktop, custom hosts —
+        talk to Frugal via
+        <a href="https://modelcontextprotocol.io" rel="noopener">MCP (Model Context Protocol)</a>.
+        That's where Frugal lives in production. The CLI is for evaluation,
+        scripting, and the install flow itself. Same routing engine
+        underneath.
       </p>
       <div class="code-grid">
         <figure>

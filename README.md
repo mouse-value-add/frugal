@@ -1,31 +1,56 @@
 # frugal
 
-**Stop picking models. Pick the cheapest toolchain that completes the job.**
+**An AI toolchain router for your agents.**
 
-Open-source AI toolchain cost optimizer for local-first AI builders. Frugal
-routes each task to the cheapest reliable path — local models, hosted models,
-search, browser tools, code execution, or cache — through a CLI you can call
-directly and an MCP server your agent stack can install.
+Frugal routes each AI task through the cheapest reliable path — search,
+chat, browser, code exec, or cache — exposed to your agent stack as
+`frugal__*` tools over [MCP (Model Context Protocol)](https://modelcontextprotocol.io).
+One signed Go binary. Your keys. No account. Source-available (BUSL 1.1 → Apache 2.0).
 
 [frugal.sh](https://frugal.sh) · [GitHub](https://github.com/brainsparker/frugal) · [Strategy](./frugal-strategy-v5.md)
 
-Most AI tasks are over-routed. Frontier model when local-plus-search would
-have worked. Long-context stuffing when retrieval would have answered. Agent
-loops when a single tool call would have. Frugal picks the cheaper,
-equally-correct path.
+```
+fresh-facts           · search + small hosted model
+research-synthesis    · long-context reasoner
+code-dev              · routed coder model
+factual-qa            · cheapest mini-tier model
+structured-extraction · cheapest JSON-mode model
+```
+
+Most AI tasks are over-routed. Frontier models for fresh facts. Long
+context for one-line answers. Agent loops for single tool calls. Frugal
+picks the cheaper, equally-correct path.
+
+## Quickstart
+
+**1. Install**
 
 ```bash
 curl -fsSL https://frugal.sh/install | bash
 ```
 
-Two ways to use it:
+**2. Set your keys** (BYOK — at least one chat-model key; add a search key if you want `fresh-facts`)
 
 ```bash
-# CLI — dispatch a task to the cheapest reliable toolchain
-frugal run "what's the weather in NYC right now"
+export OPENAI_API_KEY=sk-...
+export TAVILY_API_KEY=tvly-...     # also accepts SERPER_API_KEY, ANTHROPIC_API_KEY, GOOGLE_API_KEY
+```
 
-# MCP server — install Frugal as a routed-tool MCP server in your agent client
+**3a. Add Frugal to your agent** (Claude Desktop, Cursor, Claude Code)
+
+```bash
 frugal mcp install
+# auto-detects each agent client and merges 'frugal' into its MCP config
+```
+
+**3b. Or, run a task from the CLI**
+
+```bash
+frugal run "current iPhone prices"
+# → recipe: fresh-facts
+# → step 1: frugal__search routed to serper @ $0.0003
+# → step 2: gpt-4.1-nano(search results + question)
+# done. cost: $0.0008
 ```
 
 ---

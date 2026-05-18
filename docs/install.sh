@@ -226,8 +226,8 @@ main() {
         uninstall
     fi
 
-    info "installing frugal.sh — the open-source AI toolchain cost optimizer"
-    info "stop picking models. pick the cheapest toolchain that completes the job."
+    info "installing frugal.sh — an AI toolchain router for your agents"
+    info "cheapest reliable path per task. BYOK. one signed Go binary."
     echo
 
     local platform version

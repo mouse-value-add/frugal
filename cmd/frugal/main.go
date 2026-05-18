@@ -65,8 +65,8 @@ func stubNotImplemented(cmd, when string) int {
 }
 
 func printHelp() {
-	fmt.Println(`frugal — open-source AI toolchain cost optimizer
-Stop picking models. Pick the cheapest toolchain that completes the job.
+	fmt.Println(`frugal — an AI toolchain router for your agents
+Cheapest reliable path per task. BYOK. Source-available (BUSL 1.1 → Apache 2.0).
 
 Usage:
   frugal run <task>              Execute the cheapest reliable toolchain for the task
