@@ -43,7 +43,7 @@ func main() {
 	case "route":
 		os.Exit(runRoute(os.Args[2:]))
 	case "compare":
-		os.Exit(stubNotImplemented("compare", "Phase 1 PR 6 (stretch) or Phase 2"))
+		os.Exit(runCompare(os.Args[2:]))
 	case "mcp":
 		os.Exit(runMCP(os.Args[2:]))
 	default:

@@ -1,15 +1,18 @@
 package main
 
 import (
+	"bufio"
 	"context"
 	"flag"
 	"fmt"
 	"log/slog"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 
 	"github.com/frugalsh/frugal/internal/config"
+	"github.com/frugalsh/frugal/internal/install"
 	"github.com/frugalsh/frugal/internal/mcp"
 	"github.com/frugalsh/frugal/internal/mcp/tools"
 	"github.com/frugalsh/frugal/internal/provider/serper"
@@ -34,7 +37,7 @@ func runMCP(args []string) int {
 	case "serve":
 		return runMCPServe(args[1:])
 	case "install":
-		return stubNotImplemented("mcp install", "Phase 1 PR 6")
+		return runMCPInstall(args[1:])
 	default:
 		fmt.Fprintf(os.Stderr, "unknown mcp subcommand %q (want serve | install)\n", args[0])
 		return 2
@@ -107,6 +110,153 @@ func runMCPServe(args []string) int {
 		return 1
 	}
 	return 0
+}
+
+// runMCPInstall writes the `frugal` MCP server entry into each detected
+// agent client's config — Claude Desktop and Cursor merge into a JSON
+// file; Claude Code gets a printed `claude mcp add` command (the
+// `claude` CLI manages its own config).
+//
+// Flags:
+//   - --client <id|all>  install only into the named client (default: all detected)
+//   - --print            print the plan without writing (dry-run)
+//   - --yes              skip the confirmation prompt
+func runMCPInstall(args []string) int {
+	fs := flag.NewFlagSet("mcp install", flag.ContinueOnError)
+	fs.SetOutput(os.Stderr)
+	clientID := fs.String("client", "all", "install into a specific client (claude-desktop | cursor | claude-code | all)")
+	printOnly := fs.Bool("print", false, "print the plan without writing")
+	assumeYes := fs.Bool("yes", false, "skip the confirmation prompt")
+	fs.Usage = func() {
+		fmt.Fprintln(os.Stderr, "Usage: frugal mcp install [flags]")
+		fmt.Fprintln(os.Stderr, "Wire 'frugal' as an MCP server in agent clients (Claude Desktop, Cursor, Claude Code).")
+		fmt.Fprintln(os.Stderr)
+		fs.PrintDefaults()
+	}
+	if err := fs.Parse(args); err != nil {
+		return 2
+	}
+
+	binPath, err := install.FrugalBinary()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "frugal mcp install: %v\n", err)
+		return 1
+	}
+
+	clients := install.DetectClients()
+	targets, err := filterClients(clients, *clientID)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "frugal mcp install: %v\n", err)
+		return 2
+	}
+
+	fmt.Fprintln(os.Stderr, "detected agent clients:")
+	for _, c := range clients {
+		mark := "✗"
+		if c.Detected {
+			mark = "✓"
+		}
+		fmt.Fprintf(os.Stderr, "  %s %-15s %s\n", mark, c.Title, c.DetectionReason)
+	}
+	fmt.Fprintln(os.Stderr)
+
+	if len(targets) == 0 {
+		fmt.Fprintln(os.Stderr, "no clients selected for install.")
+		if *clientID == "all" {
+			fmt.Fprintln(os.Stderr, "(no detected clients — install Claude Desktop, Cursor, or Claude Code first,")
+			fmt.Fprintln(os.Stderr, " or pass --client X to force install into one anyway.)")
+		}
+		return 1
+	}
+
+	fmt.Fprintf(os.Stderr, "frugal binary: %s\n", binPath)
+	fmt.Fprintln(os.Stderr, "planned changes:")
+	for _, c := range targets {
+		fmt.Fprintf(os.Stderr, "  - %s: %s\n", c.Title, install.PlanFor(c, binPath))
+	}
+	fmt.Fprintln(os.Stderr)
+
+	if *printOnly {
+		fmt.Fprintln(os.Stderr, "(--print set; no changes written.)")
+		return 0
+	}
+
+	if !*assumeYes && !confirm("apply the changes above?") {
+		fmt.Fprintln(os.Stderr, "aborted.")
+		return 1
+	}
+
+	var hadErr bool
+	for _, c := range targets {
+		suggestion, err := install.Apply(c, binPath)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "✗ %s: %v\n", c.Title, err)
+			hadErr = true
+			continue
+		}
+		switch c.Kind {
+		case install.KindJSONFile:
+			fmt.Fprintf(os.Stderr, "✓ %s: wrote %s\n", c.Title, c.ConfigPath)
+		case install.KindCLI:
+			fmt.Fprintf(os.Stderr, "→ %s: run this command yourself (the `claude` CLI manages its own config)\n", c.Title)
+			fmt.Fprintf(os.Stderr, "    %s\n", suggestion)
+		}
+	}
+	if hadErr {
+		return 1
+	}
+	fmt.Fprintln(os.Stderr)
+	fmt.Fprintln(os.Stderr, "next steps:")
+	fmt.Fprintln(os.Stderr, "  1. set TAVILY_API_KEY and/or SERPER_API_KEY in the env where the agent runs")
+	fmt.Fprintln(os.Stderr, "     (for Claude Desktop: add env vars to the same config; for Cursor: same)")
+	fmt.Fprintln(os.Stderr, "  2. restart the agent client to pick up the new MCP server")
+	fmt.Fprintln(os.Stderr, "  3. look for the 'frugal__search' tool in the agent's tool picker")
+	return 0
+}
+
+// filterClients narrows the catalog down to the install targets per the
+// --client flag. "all" → every detected client. Specific ID → that one
+// client whether detected or not (operator override). Unknown ID → error.
+func filterClients(all []install.Client, want string) ([]install.Client, error) {
+	if want == "" || want == "all" {
+		var out []install.Client
+		for _, c := range all {
+			if c.Detected {
+				out = append(out, c)
+			}
+		}
+		return out, nil
+	}
+	for _, c := range all {
+		if c.ID == want {
+			return []install.Client{c}, nil
+		}
+	}
+	known := make([]string, 0, len(all))
+	for _, c := range all {
+		known = append(known, c.ID)
+	}
+	return nil, fmt.Errorf("unknown client %q (known: %s | all)", want, strings.Join(known, " | "))
+}
+
+// confirm prompts on stdin for a Y/n answer. Returns true on Y / y /
+// empty (default Yes); false on n / N. Other input re-prompts.
+func confirm(question string) bool {
+	r := bufio.NewReader(os.Stdin)
+	for {
+		fmt.Fprintf(os.Stderr, "%s [Y/n] ", question)
+		line, err := r.ReadString('\n')
+		if err != nil {
+			return false
+		}
+		line = strings.TrimSpace(strings.ToLower(line))
+		switch line {
+		case "", "y", "yes":
+			return true
+		case "n", "no":
+			return false
+		}
+	}
 }
 
 // buildSearchers instantiates one search.Searcher per search_providers
