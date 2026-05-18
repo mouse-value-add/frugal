@@ -1,6 +1,7 @@
 # Recipe: "Multi-source research" (search + rerank, hosted-if-needed).
-# Today only the `chat` slot ships; `search`/`rerank` are stubbed schema
-# slots. See `frugal-strategy-v5.md` §6 for the canonical component status.
+# Today only the chat step routes live traffic; the search step is wired
+# once Phase 1 PR 4 lands. See `frugal-strategy-v5.md` §6 for the
+# canonical component status.
 id: research-synthesis
 description: >
   Long-form research questions requiring multi-source synthesis. Examples:
@@ -9,41 +10,51 @@ description: >
   long-context reasoning plus retrieval and reranking to keep prompt costs
   under control.
 
-# Curation is author-judgment today. `frugal bench --use-case research-synthesis`
-# produces the data that will eventually flip `source` to `benchmark-derived`.
 source: curated
-as_of: "2026-04-21"
+as_of: "2026-05-18"
 confidence: medium
 
-# Each bundle declares the recommended (capability → model) map for a quality
-# tier. Today only `chat` routes live traffic; `search` and `rerank` slots
-# exist but are stubbed (no executor wired). They light up when the eval
-# supports them. Null fields are intentionally left in place so the schema
-# is stable as capabilities expand.
-bundles:
+classifier:
+  hints:
+    - summarize
+    - synthesize
+    - synthesis
+    - literature review
+    - compare
+    - survey
+    - research
+
+recipes:
   high:
-    chat: claude-opus-4-20250918
-    search: null
-    rerank: null
+    steps:
+      - chat:
+          model: claude-opus-4-20250918
+          system: "Synthesize a thorough, well-cited answer from the supplied research."
+          input: "{task}"
     reason: >
       Opus handles long context and multi-source reasoning best; the cost
       premium is justified when the caller's work hinges on synthesis quality.
+      Search + rerank steps prepend automatically once Phase 1 PR 4 lands.
 
   balanced:
-    chat: claude-sonnet-4-20250514
-    search: null
-    rerank: null
+    steps:
+      - chat:
+          model: claude-sonnet-4-20250514
+          system: "Synthesize an accurate answer with citations from the supplied research."
+          input: "{task}"
     reason: >
       Sonnet 4 is ~80% of Opus quality at 40% of the cost on long-form
       research tasks. Default choice for the use case.
 
   cost:
-    chat: gpt-4o-mini
-    search: null
-    rerank: null
+    steps:
+      - chat:
+          model: gpt-4o-mini
+          system: "Synthesize a clear answer from the supplied research."
+          input: "{task}"
     reason: >
       Budget tier. Accepts reduced breadth and less nuanced synthesis for
-      ~90% lower per-request cost. Best paired with a stricter rerank
-      pass once Ring 1c lands.
+      ~90% lower per-request cost. Best paired with a stricter rerank pass
+      once Phase 1 PR 4 lands.
 
 workload: config/workloads/use-cases/research-synthesis.yaml

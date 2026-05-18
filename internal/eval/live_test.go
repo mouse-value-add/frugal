@@ -10,7 +10,7 @@ import (
 	"github.com/frugalsh/frugal/internal/provider"
 	"github.com/frugalsh/frugal/internal/router"
 	"github.com/frugalsh/frugal/internal/types"
-	"github.com/frugalsh/frugal/internal/usecase"
+	"github.com/frugalsh/frugal/internal/recipe"
 )
 
 // mockProv returns a canned response per model so we can exercise both the
@@ -308,7 +308,10 @@ func TestLiveRunner_AttachesSearchToolWhenBundleHasSearch(t *testing.T) {
 		Classifier: classifier.NewRuleBased(),
 		Registry:   reg,
 		ModelCosts: map[string]ModelCost{"m": {InputPer1K: 0.001, OutputPer1K: 0.001}},
-		Bundle:     usecase.Bundle{Chat: "m", Search: "search-stub"},
+		Tier: recipe.TierRecipe{Steps: []recipe.Step{
+			{Tool: "frugal__search"},
+			{Chat: &recipe.ChatStep{Model: "m"}},
+		}},
 	}
 
 	w := LiveWorkload{
@@ -319,7 +322,7 @@ func TestLiveRunner_AttachesSearchToolWhenBundleHasSearch(t *testing.T) {
 		t.Fatalf("Run: %v", err)
 	}
 	if len(mock.recordedTools) == 0 {
-		t.Fatalf("expected search tool attached when bundle.Search is set")
+		t.Fatalf("expected search tool attached when recipe tier includes a frugal__search step")
 	}
 	if mock.recordedTools[0].Function.Name != "search" {
 		t.Errorf("expected tool name=search, got %q", mock.recordedTools[0].Function.Name)

@@ -39,25 +39,13 @@ func main() {
 	case "bench":
 		os.Exit(runBench(configPath, os.Args[2:]))
 	case "run":
-		os.Exit(stubNotImplemented("run", "Phase 1 PR 5"))
+		os.Exit(runRun(os.Args[2:]))
 	case "route":
-		os.Exit(stubNotImplemented("route", "Phase 1 PR 5"))
+		os.Exit(runRoute(os.Args[2:]))
 	case "compare":
 		os.Exit(stubNotImplemented("compare", "Phase 1 PR 6 (stretch) or Phase 2"))
 	case "mcp":
-		if len(os.Args) < 3 {
-			fmt.Fprintln(os.Stderr, "usage: frugal mcp <install|serve> [flags]")
-			os.Exit(2)
-		}
-		switch os.Args[2] {
-		case "install":
-			os.Exit(stubNotImplemented("mcp install", "Phase 1 PR 6"))
-		case "serve":
-			os.Exit(stubNotImplemented("mcp serve", "Phase 1 PR 3"))
-		default:
-			fmt.Fprintf(os.Stderr, "unknown mcp subcommand %q\n", os.Args[2])
-			os.Exit(2)
-		}
+		os.Exit(runMCP(os.Args[2:]))
 	default:
 		fmt.Fprintf(os.Stderr, "unknown command %q. Run 'frugal --help' for usage.\n", os.Args[1])
 		os.Exit(2)

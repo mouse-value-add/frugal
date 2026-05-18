@@ -60,20 +60,21 @@ the cheapest reliable default Frugal aims to route. Status tags are honest —
 | Task | Cheapest reliable path | Status |
 |---|---|---|
 | Summarize a document | Local small model | Planned (Phase 3) |
-| Fresh facts (news, prices, schedules) | Search + small hosted model | Phase 1 (search lands in PR 4) |
+| Fresh facts (news, prices, schedules) | Search + small hosted model | **Shipping** (`fresh-facts` recipe + `frugal__search`) |
 | Extract from a webpage | Browser/fetch + local model | Planned (Phase 2 browser; Phase 3 local) |
 | Complex reasoning (planning, hard math, novel code) | Hosted frontier model | Phase 1 (recipe step uses internal chat router) |
 | Code generation, refactors | Local code model → hosted fallback | Partial (Phase 1 hosted; Phase 3 local) |
 | Repeated / near-duplicate questions | Semantic cache | Planned (Phase 2) |
-| Multi-source research | Search + rerank, hosted-if-needed | Phase 1 (search) + Phase 2 (rerank) |
+| Multi-source research | Search + rerank, hosted-if-needed | **Shipping (search)** + Phase 2 (rerank) |
 | Structured extraction (text → JSON) | Smallest JSON-mode-reliable hosted model | Phase 1 (recipe step uses internal chat router) |
 
-Four recipes ship as named use cases in `config/use_cases/`:
+Five recipes ship today as named use cases in `config/use_cases/`:
 [`research-synthesis`](./config/use_cases/research-synthesis.yaml),
 [`code-dev`](./config/use_cases/code-dev.yaml),
-[`factual-qa`](./config/use_cases/factual-qa.yaml), and
-[`structured-extraction`](./config/use_cases/structured-extraction.yaml).
-A new `fresh-facts` recipe lands alongside the search tool in Phase 1 PR 4.
+[`factual-qa`](./config/use_cases/factual-qa.yaml),
+[`structured-extraction`](./config/use_cases/structured-extraction.yaml),
+and [`fresh-facts`](./config/use_cases/fresh-facts.yaml) — the latter
+lights up alongside `frugal__search`.
 
 ## Two surfaces, one router
 
@@ -144,7 +145,7 @@ each component carries one of three labels:
 | Component | What it is | Status |
 |---|---|---|
 | Hosted chat models | OpenAI / Anthropic / Google chat completions, routed per use case | **Shipping (internal)** — used by recipe chat steps; exposed as `frugal__chat` MCP tool in Phase 2 |
-| Search API | Routed cheapest web search provider per use case (Tavily, Serper, …) | Stubbed (executor lands in Phase 1 PR 4) |
+| Search API | Routed cheapest web search provider per use case (Tavily, Serper) | **Shipping** — `frugal__search` MCP tool |
 | Local models | Local-server-backed chat for the cheap path on summarize / code / extract | Planned (Phase 3) |
 | Browser / fetch | Headless fetch + readable extraction for webpage tasks | Planned (Phase 2) |
 | Content extraction | URL → clean text routed across multiple providers | Planned (Phase 2) |
@@ -245,8 +246,8 @@ Model pricing synced from [models.dev](https://models.dev) on every startup.
 | OpenAI | Hosted chat (GPT-4o, GPT-4o-mini, GPT-4.1, GPT-4.1-mini, GPT-4.1-nano) |
 | Anthropic | Hosted chat (Claude Opus 4, Claude Sonnet 4, Claude Haiku 3.5) |
 | Google | Hosted chat (Gemini 2.5 Pro, Gemini 2.5 Flash, Gemini 2.0 Flash) |
-| Tavily *(Phase 1 PR 4)* | Routed search |
-| Serper *(Phase 1 PR 4)* | Routed search |
+| Tavily | Routed search (LLM-tuned recall) |
+| Serper | Routed search (cheap per-call) |
 
 Set the matching env vars: `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`,
 `GOOGLE_API_KEY`, `TAVILY_API_KEY`, `SERPER_API_KEY`. Frugal registers

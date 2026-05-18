@@ -12,7 +12,7 @@ import (
 	"github.com/frugalsh/frugal/internal/provider"
 	"github.com/frugalsh/frugal/internal/router"
 	"github.com/frugalsh/frugal/internal/types"
-	"github.com/frugalsh/frugal/internal/usecase"
+	"github.com/frugalsh/frugal/internal/recipe"
 )
 
 // LiveRunner executes real ChatCompletion calls for each problem in a
@@ -35,10 +35,10 @@ type LiveRunner struct {
 	// Judge is optional. When set, problems with a non-empty JudgeRubric run
 	// an additional LLM-judge pass on top of the deterministic scorer.
 	Judge *Judge
-	// Bundle, when its Search field is non-empty, attaches a synthetic
+	// Tier, when it includes a frugal__search tool step, attaches a synthetic
 	// `search` tool to every chat request so tool-use accuracy measures the
-	// bundle's actual decisions rather than a hypothetical capability.
-	Bundle usecase.Bundle
+	// recipe's actual decisions rather than a hypothetical capability.
+	Tier recipe.TierRecipe
 	// Stream switches to ChatCompletionStream so the runner can capture TTFT.
 	// Off by default to keep the cost path identical to non-streaming runs;
 	// flip via --stream on the CLI when TTFT is needed.
@@ -208,7 +208,7 @@ func (r *LiveRunner) Run(ctx context.Context, w LiveWorkload, quality types.Qual
 		}
 
 		req := buildRequest(p)
-		if r.Bundle.Search != "" {
+		if r.Tier.HasToolStep("frugal__search") {
 			req.Tools = append(req.Tools, searchTool())
 		}
 		features := r.Classifier.Classify(req)

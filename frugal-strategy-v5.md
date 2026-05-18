@@ -53,15 +53,15 @@ The public-facing artifact is the recipe table — task → cheapest reliable pa
 | Task | Cheapest reliable path | Status |
 |---|---|---|
 | Summarize a document | Local small model | Planned (Phase 3) |
-| Fresh facts (news, prices, schedules) | Search + small hosted model | Phase 1 (search lands in PR 4) |
+| Fresh facts (news, prices, schedules) | Search + small hosted model | **Shipping** (`fresh-facts` recipe + `frugal__search`) |
 | Extract from a webpage | Browser/fetch + local model | Planned (Phase 2 browser; Phase 3 local) |
 | Complex reasoning (planning, hard math, novel code) | Hosted frontier model | Phase 1 (recipe step uses internal chat router) |
 | Code generation, refactors | Local code model → hosted fallback | Partial (Phase 1 hosted; Phase 3 local) |
 | Repeated / near-duplicate questions | Semantic cache | Planned (Phase 2) |
-| Multi-source research | Search + rerank, hosted-if-needed | Phase 1 (search) + Phase 2 (rerank) |
+| Multi-source research | Search + rerank, hosted-if-needed | **Shipping (search)** + Phase 2 (rerank) |
 | Structured extraction (text → JSON) | Smallest JSON-mode-reliable hosted model | Phase 1 (recipe step uses internal chat router) |
 
-Today's four use-case YAMLs (`research-synthesis`, `code-dev`, `factual-qa`, `structured-extraction`) migrate to the new recipe schema in Phase 1 PR 2. A new `fresh-facts` recipe lands in Phase 1 PR 4 alongside the search tool.
+Five recipes ship today: `research-synthesis`, `code-dev`, `factual-qa`, `structured-extraction` (migrated to the new schema in Phase 1 PR 2), and `fresh-facts` (Phase 1 PR 4, alongside the search tool).
 
 ## 5. Product surfaces
 
@@ -87,7 +87,7 @@ The router's reach is bigger than what's wired today. Honesty over aspiration �
 | Component | What it is | Status |
 |---|---|---|
 | Hosted chat models | OpenAI / Anthropic / Google chat completions, routed per use case | **Shipping (internal)** — recipe chat steps; `frugal__chat` MCP tool lands Phase 2 |
-| Search API | Routed cheapest web search provider per use case (Tavily, Serper, …) | Stubbed (executor lands in Phase 1 PR 4) |
+| Search API | Routed cheapest web search provider per use case (Tavily, Serper) | **Shipping** — `frugal__search` MCP tool (Phase 1 PR 4) |
 | Local models | Local-server-backed chat for the cheap path on summarize / code / extract | Planned (Phase 3) |
 | Browser / fetch | Headless fetch + readable extraction for webpage tasks | Planned (Phase 2) |
 | Content extraction | URL → clean text routed across multiple providers | Planned (Phase 2) |

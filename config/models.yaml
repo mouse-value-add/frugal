@@ -183,3 +183,17 @@ quality_thresholds:
         min_coding: 0.85
         min_creative: 0.82
         min_instruction_following: 0.88
+
+# Routed search providers consumed by the frugal__search MCP tool.
+# Each entry whose api_key_env is set in the operator's environment is
+# registered at startup; the cheapest cost_per_call is the default route
+# when the tool is called without an explicit `provider` argument.
+search_providers:
+    tavily:
+        api_key_env: TAVILY_API_KEY
+        base_url: https://api.tavily.com
+        cost_per_call: 0.008
+    serper:
+        api_key_env: SERPER_API_KEY
+        base_url: https://google.serper.dev
+        cost_per_call: 0.0003

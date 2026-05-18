@@ -155,20 +155,21 @@ tool 'frugal__search' now available in your agent stack.</span></code></pre>
           </thead>
           <tbody>
             <tr><td>Summarize a document</td><td>Local small model</td><td><span class="status-tag tag-planned">Planned</span></td></tr>
-            <tr><td>Fresh facts (news, prices, schedules)</td><td>Search + small hosted model</td><td><span class="status-tag tag-stubbed">Phase 1</span></td></tr>
+            <tr><td>Fresh facts (news, prices, schedules)</td><td>Search + small hosted model</td><td><span class="status-tag tag-shipping">Shipping</span></td></tr>
             <tr><td>Extract from a webpage</td><td>Browser/fetch + local model</td><td><span class="status-tag tag-planned">Planned</span></td></tr>
             <tr><td>Complex reasoning (planning, hard math, novel code)</td><td>Hosted frontier model</td><td><span class="status-tag tag-shipping">Shipping</span></td></tr>
             <tr><td>Code generation, refactors</td><td>Local code model → hosted fallback</td><td><span class="status-tag tag-partial">Partial</span></td></tr>
             <tr><td>Repeated / near-duplicate questions</td><td>Semantic cache</td><td><span class="status-tag tag-planned">Planned</span></td></tr>
-            <tr><td>Multi-source research</td><td>Search + rerank, hosted-if-needed</td><td><span class="status-tag tag-stubbed">Phase 1</span></td></tr>
+            <tr><td>Multi-source research</td><td>Search + rerank, hosted-if-needed</td><td><span class="status-tag tag-partial">Search shipping</span></td></tr>
             <tr><td>Structured extraction (text → JSON)</td><td>Smallest JSON-mode-reliable hosted model</td><td><span class="status-tag tag-shipping">Shipping</span></td></tr>
           </tbody>
         </table>
       </div>
       <p class="prose recipes-foot">
-        Four of these recipes ship today as named use cases —
+        Five recipes ship today as named use cases —
         <code>research-synthesis</code>, <code>code-dev</code>,
-        <code>factual-qa</code>, <code>structured-extraction</code>.
+        <code>factual-qa</code>, <code>structured-extraction</code>,
+        and <code>fresh-facts</code>.
         <a href="https://github.com/brainsparker/frugal#recipes--common-tasks-cheapest-reliable-paths" rel="noopener">See all recipes in the README →</a>
       </p>
     </section>
@@ -297,8 +298,8 @@ baseline: gpt-4o      → $0.0182 → pass
           <p>OpenAI, Anthropic, Google chat completions inside recipe chat steps. Exposed as <code>frugal__chat</code> MCP tool in Phase 2.</p>
         </div>
         <div class="provider">
-          <h3>Search API <span class="status-tag tag-stubbed">phase 1</span></h3>
-          <p>Routed cheapest web search per use case (Tavily, Serper). Ships in Phase 1 PR 4 as the <code>frugal__search</code> MCP tool.</p>
+          <h3>Search API <span class="status-tag tag-shipping">shipping</span></h3>
+          <p>Routed cheapest web search per use case (Tavily, Serper) via the <code>frugal__search</code> MCP tool. Set <code>TAVILY_API_KEY</code> and/or <code>SERPER_API_KEY</code>.</p>
         </div>
         <div class="provider">
           <h3>Local models <span class="status-tag tag-planned">planned</span></h3>
@@ -338,8 +339,12 @@ baseline: gpt-4o      → $0.0182 → pass
       </p>
       <div class="provider-grid">
         <div class="provider">
+          <h3>fresh-facts</h3>
+          <p>Time-sensitive questions: today's news, current prices, this week's scores. Routes <code>frugal__search</code> + small chat synthesis.</p>
+        </div>
+        <div class="provider">
           <h3>research-synthesis</h3>
-          <p>Long-form multi-source research. Chat today; search + rerank steps land in Phase 1.</p>
+          <p>Long-form multi-source research. Chat today; rerank lands Phase 2.</p>
         </div>
         <div class="provider">
           <h3>code-dev</h3>

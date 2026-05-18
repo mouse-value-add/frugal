@@ -10,14 +10,24 @@ import (
 )
 
 type Config struct {
-	Providers         map[string]ProviderConfig  `yaml:"providers"`
-	QualityThresholds map[string]ThresholdConfig `yaml:"quality_thresholds"`
+	Providers         map[string]ProviderConfig       `yaml:"providers"`
+	QualityThresholds map[string]ThresholdConfig      `yaml:"quality_thresholds"`
+	SearchProviders   map[string]SearchProviderConfig `yaml:"search_providers,omitempty"`
 }
 
 type ProviderConfig struct {
 	APIKeyEnv string                 `yaml:"api_key_env"`
 	BaseURL   string                 `yaml:"base_url"`
 	Models    map[string]ModelConfig `yaml:"models"`
+}
+
+// SearchProviderConfig describes a routed search backend (Tavily, Serper, …).
+// The frugal__search MCP tool registers one entry per configured provider;
+// the auto-router picks the lowest CostPerCall among those with a key set.
+type SearchProviderConfig struct {
+	APIKeyEnv   string  `yaml:"api_key_env"`
+	BaseURL     string  `yaml:"base_url,omitempty"`
+	CostPerCall float64 `yaml:"cost_per_call"`
 }
 
 type ModelConfig struct {
@@ -92,6 +102,15 @@ func validate(cfg *Config) error {
 			if err := validateUnitInterval(fmt.Sprintf("providers.%s.models.%s.capabilities.instruction_following", providerName, modelName), model.Capabilities.InstructionFollowing); err != nil {
 				return err
 			}
+		}
+	}
+
+	for name, sp := range cfg.SearchProviders {
+		if sp.CostPerCall < 0 {
+			return fmt.Errorf("search_providers.%s.cost_per_call must be non-negative", name)
+		}
+		if sp.APIKeyEnv == "" {
+			return fmt.Errorf("search_providers.%s.api_key_env is required", name)
 		}
 	}
 

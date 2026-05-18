@@ -16,9 +16,9 @@ import (
 	"github.com/frugalsh/frugal/internal/provider/anthropic"
 	"github.com/frugalsh/frugal/internal/provider/google"
 	"github.com/frugalsh/frugal/internal/provider/openai"
+	"github.com/frugalsh/frugal/internal/recipe"
 	"github.com/frugalsh/frugal/internal/router"
 	"github.com/frugalsh/frugal/internal/types"
-	"github.com/frugalsh/frugal/internal/usecase"
 )
 
 const defaultBenchWorkload = "config/workloads/starter.yaml"
@@ -30,7 +30,7 @@ const defaultBenchWorkload = "config/workloads/starter.yaml"
 func runBench(configPath string, args []string) int {
 	fs := flag.NewFlagSet("bench", flag.ContinueOnError)
 	fs.SetOutput(os.Stderr)
-	useCaseID := fs.String("use-case", "", "use-case ID from config/use_cases (factual-qa | code-dev | research-synthesis | structured-extraction). When set, the bundle's chat model becomes the baseline.")
+	useCaseID := fs.String("use-case", "", "recipe ID from config/use_cases (factual-qa | code-dev | research-synthesis | structured-extraction). When set, the recipe's chat-step model becomes the baseline.")
 	workloadPath := fs.String("workload", "", "path to workload YAML (overrides the use-case's workload; defaults to "+defaultBenchWorkload+" when --use-case is unset)")
 	qualityStr := fs.String("quality", "balanced", "quality tier (high | balanced | cost)")
 	outPath := fs.String("out", "", "write markdown report to this path in addition to stdout")
@@ -41,7 +41,7 @@ func runBench(configPath string, args []string) int {
 		fmt.Fprintln(os.Stderr, "Usage: frugal bench [flags]")
 		fmt.Fprintln(os.Stderr, "Measures cost, quality, latency, and tool-use accuracy for every problem")
 		fmt.Fprintln(os.Stderr, "in the workload, calling real provider APIs. Use --use-case to compare")
-		fmt.Fprintln(os.Stderr, "Frugal's bundle vs the curated baseline for that use case.")
+		fmt.Fprintln(os.Stderr, "Frugal's recipe vs the curated baseline for that use case.")
 		fmt.Fprintln(os.Stderr, "Requires whichever provider keys the workload's models + baseline need")
 		fmt.Fprintln(os.Stderr, "(OPENAI_API_KEY, ANTHROPIC_API_KEY, GOOGLE_API_KEY).")
 		fmt.Fprintln(os.Stderr)
@@ -57,38 +57,39 @@ func runBench(configPath string, args []string) int {
 		return 2
 	}
 
-	// Resolve the use case if requested. The bundle's chat model becomes the
-	// canonical baseline ("what would I get without Frugal for this use case").
-	var bundle usecase.Bundle
+	// Resolve the recipe if requested. The chosen tier's chat-step model
+	// becomes the canonical baseline ("what would I get without Frugal for
+	// this use case").
+	var tier recipe.TierRecipe
 	var useCaseLabel string
 	if *useCaseID != "" {
 		dir := os.Getenv("FRUGAL_USE_CASES_DIR")
 		if dir == "" {
 			dir = "config/use_cases"
 		}
-		ucReg, err := usecase.Load(dir)
+		recReg, err := recipe.Load(dir)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "frugal bench: load use cases: %v\n", err)
+			fmt.Fprintf(os.Stderr, "frugal bench: load recipes: %v\n", err)
 			return 1
 		}
-		uc, ok := ucReg.Get(*useCaseID)
+		rec, ok := recReg.Get(*useCaseID)
 		if !ok {
-			fmt.Fprintf(os.Stderr, "frugal bench: unknown use case %q (known: %v)\n", *useCaseID, ucReg.IDs())
+			fmt.Fprintf(os.Stderr, "frugal bench: unknown recipe %q (known: %v)\n", *useCaseID, recReg.IDs())
 			return 2
 		}
-		b, ok := ucReg.Bundle(*useCaseID, string(quality))
-		if !ok || b.Chat == "" {
-			fmt.Fprintf(os.Stderr, "frugal bench: use case %q has no bundle for quality %q\n", *useCaseID, quality)
+		t, ok := recReg.Tier(*useCaseID, string(quality))
+		if !ok || t.ChatModel() == "" {
+			fmt.Fprintf(os.Stderr, "frugal bench: recipe %q has no chat step for quality %q\n", *useCaseID, quality)
 			return 2
 		}
-		bundle = b
+		tier = t
 		useCaseLabel = *useCaseID
-		// Fall back to the use case's referenced workload when --workload isn't set.
-		if *workloadPath == "" && uc.Workload != "" {
-			if _, err := os.Stat(uc.Workload); err == nil {
-				*workloadPath = uc.Workload
+		// Fall back to the recipe's referenced workload when --workload isn't set.
+		if *workloadPath == "" && rec.Workload != "" {
+			if _, err := os.Stat(rec.Workload); err == nil {
+				*workloadPath = rec.Workload
 			} else {
-				fmt.Fprintf(os.Stderr, "frugal bench: use case workload %q not found, falling back to %s\n", uc.Workload, defaultBenchWorkload)
+				fmt.Fprintf(os.Stderr, "frugal bench: recipe workload %q not found, falling back to %s\n", rec.Workload, defaultBenchWorkload)
 			}
 		}
 	}
@@ -115,11 +116,11 @@ func runBench(configPath string, args []string) int {
 		return 1
 	}
 
-	// Use-case bundle's chat model is the authoritative baseline for that use
-	// case. Only override after a successful workload load so YAML errors still
-	// surface clearly.
-	if bundle.Chat != "" {
-		w.Baseline = bundle.Chat
+	// The recipe's chat-step model is the authoritative baseline for that
+	// use case. Only override after a successful workload load so YAML
+	// errors still surface clearly.
+	if m := tier.ChatModel(); m != "" {
+		w.Baseline = m
 	}
 
 	cfg, err := config.Load(configPath)
@@ -160,7 +161,7 @@ func runBench(configPath string, args []string) int {
 		mc := runner.ModelCosts[*judgeModel]
 		runner.Judge = &eval.Judge{Model: *judgeModel, Provider: prov, ModelCost: mc}
 	}
-	runner.Bundle = bundle
+	runner.Tier = tier
 	runner.Stream = *stream
 
 	ctx, cancel := context.WithTimeout(context.Background(), *timeout)
