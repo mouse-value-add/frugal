@@ -157,6 +157,7 @@ problems:
   - id: explain-quicksort
     category: reasoning
     tool_use: forbidden
+    expected_min_tier: balanced
     prompt: |
       In two to four sentences, explain how quicksort works.
     max_tokens: 220
@@ -170,6 +171,7 @@ problems:
   - id: explain-big-o-sort
     category: reasoning
     tool_use: forbidden
+    expected_min_tier: balanced
     prompt: "What is the average-case time complexity of mergesort? Just the notation."
     max_tokens: 20
     expected_contains: "n log n"
@@ -178,20 +180,22 @@ problems:
   - id: explain-rest-vs-rpc
     category: reasoning
     tool_use: forbidden
+    expected_min_tier: balanced
     prompt: |
       In three to five sentences, contrast REST and RPC as API styles.
     max_tokens: 300
-    expected_contains_all: [resource, verb]
+    expected_contains_all: [resource, procedure]
     case_fold: true
     judge_rubric: |
       The answer must contrast REST's resource/noun orientation with RPC's
-      action/verb orientation, and mention at least one concrete difference
-      (HTTP verbs, URL structure, statelessness, or coupling). Reject answers
+      procedure/action orientation, and mention at least one concrete difference
+      (HTTP methods, URL structure, statelessness, or coupling). Reject answers
       that conflate the two or describe only one style.
 
   - id: explain-db-index
     category: reasoning
     tool_use: forbidden
+    expected_min_tier: balanced
     prompt: |
       In two sentences, explain why a B-tree index speeds up equality lookups.
     max_tokens: 200
