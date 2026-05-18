@@ -517,65 +517,112 @@ h3 { font-size: 1.05rem; }
 
 /* Rack-rates table -------------------------------------------------------- */
 
+/* Locally darker borders for the rack-table only — the global --border is
+   too low-contrast to give a comparison table the row + column structure
+   it needs. */
+.rack-table {
+  --rack-border: #2f2f33;
+  --rack-row-header-bg: #1c1c1f;
+  --rack-header-bg: #1a1a1d;
+  --rack-free-bg: rgba(16, 185, 129, 0.10);
+}
+@media (prefers-color-scheme: light) {
+  .rack-table {
+    --rack-border: #d4d4d8;
+    --rack-row-header-bg: #f4f4f5;
+    --rack-header-bg: #ececef;
+    --rack-free-bg: rgba(5, 150, 105, 0.10);
+  }
+}
+
 .rack-table-wrap {
   overflow-x: auto;
   margin: 22px 0 14px;
-  border: 1px solid var(--border);
+  border: 1px solid var(--rack-border, var(--border));
   border-radius: 10px;
+  background: var(--surface);
 }
 .rack-table {
   width: 100%;
   border-collapse: collapse;
   font-size: 14px;
+  table-layout: fixed;
 }
 .rack-table th,
 .rack-table td {
   text-align: left;
-  padding: 13px 16px;
-  border-bottom: 1px solid var(--border);
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--rack-border);
+  border-right: 1px solid var(--rack-border);
   vertical-align: top;
+  line-height: 1.5;
 }
-.rack-table thead th {
-  background: rgba(127, 127, 127, 0.04);
-  font-weight: 600;
-  color: var(--dim);
-  font-size: 11.5px;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-}
-.rack-table thead th:first-child {
-  text-transform: none;
-  letter-spacing: 0;
-  font-size: 12.5px;
-  color: var(--fg);
-}
-.rack-table tbody th {
-  font-weight: 600;
-  color: var(--fg);
-  width: 14%;
-  white-space: nowrap;
-}
+.rack-table th:last-child,
+.rack-table td:last-child { border-right: none; }
 .rack-table tbody tr:last-child th,
 .rack-table tbody tr:last-child td { border-bottom: none; }
+
+/* Column header row */
+.rack-table thead th {
+  background: var(--rack-header-bg);
+  border-bottom: 2px solid var(--rack-border);
+  font-weight: 600;
+  color: var(--fg);
+  font-size: 11.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  text-align: center;
+}
+.rack-table thead th:first-child {
+  text-align: left;
+  letter-spacing: 0.06em;
+}
+.rack-table thead th .status-tag {
+  font-size: 10px;
+  padding: 3px 9px;
+  letter-spacing: 0.08em;
+}
+
+/* Row-header sidebar (capability column) */
+.rack-table tbody th {
+  background: var(--rack-row-header-bg);
+  font-weight: 600;
+  color: var(--fg);
+  width: 13%;
+  font-size: 13.5px;
+  white-space: nowrap;
+}
+
+/* Body cells */
 .rack-table tbody td {
   color: var(--dim);
+  font-size: 13.5px;
 }
 .rack-table tbody td strong {
   color: var(--fg);
   font-weight: 600;
 }
-.rack-table tbody td:nth-child(2) {
-  background: rgba(16, 185, 129, 0.04);
+
+/* Free/local column tint — the winner */
+.rack-table tbody td:nth-child(2),
+.rack-table thead th:nth-child(2) {
+  background: var(--rack-free-bg);
 }
-.rack-table thead th .status-tag {
-  font-size: 9.5px;
-  padding: 2px 7px;
+
+/* Column widths to balance content density */
+.rack-table thead th:nth-child(2),
+.rack-table thead th:nth-child(3),
+.rack-table thead th:nth-child(4) {
+  width: 29%;
 }
+
 .rack-foot { margin-top: 12px; color: var(--dim); font-size: 14px; max-width: 72ch; }
 
 @media (max-width: 780px) {
-  .rack-table th, .rack-table td { padding: 10px 12px; font-size: 13px; }
+  .rack-table { table-layout: auto; }
+  .rack-table th, .rack-table td { padding: 11px 12px; font-size: 12.5px; }
   .rack-table tbody th { width: auto; }
+  .rack-table thead th .status-tag { font-size: 9px; padding: 2px 6px; }
 }
 
 /* Recipes table ----------------------------------------------------------- */
