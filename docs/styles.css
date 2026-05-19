@@ -1,9 +1,10 @@
 /* Frugal — marketing styles.
-   Dark-primary. Bricolage Grotesque (display) + Geist (body) + Geist Mono.
-   Atmospheric glow orbs in the hero, designed comparison block in the
-   middle, frosted install cards near the bottom. No build pipeline. */
+   Dark-primary. Single sans-serif family (Geist) at multiple weights;
+   Geist Mono for terminals. G2-influenced information density: capability
+   tile grid, social-proof row, badged comparison block, CTA banner.
+   No build pipeline. */
 
-@import url("https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,600;12..96,700&family=Geist:wght@400;500&family=Geist+Mono:wght@400;500&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap");
 
 /* --- tokens ---------------------------------------------------------- */
 
@@ -30,9 +31,8 @@
   --amber: #fb923c;
   --amber-soft: rgba(251, 146, 60, 0.16);
 
-  /* type */
-  --font-display: "Bricolage Grotesque", ui-serif, Georgia, serif;
-  --font-body: "Geist", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  /* type — one sans-serif family across the page, plus mono for terminals */
+  --font-sans: "Geist", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-mono: "Geist Mono", ui-monospace, SFMono-Regular, "SF Mono", Menlo, Monaco, monospace;
 
   /* layout */
@@ -53,7 +53,7 @@ body {
   margin: 0;
   background: var(--bg);
   color: var(--fg);
-  font-family: var(--font-body);
+  font-family: var(--font-sans);
   font-size: 16px;
   line-height: 1.55;
   font-feature-settings: "ss01", "cv11";
@@ -86,22 +86,25 @@ img, svg { display: block; max-width: 100%; }
 /* --- type primitives ------------------------------------------------- */
 
 h1, h2, h3 {
-  font-family: var(--font-display);
-  letter-spacing: -0.02em;
-  line-height: 1.05;
+  font-family: var(--font-sans);
+  letter-spacing: -0.025em;
+  line-height: 1.08;
   margin: 0;
   font-weight: 600;
 }
 h1 {
-  font-size: clamp(2.75rem, 5.5vw, 4.5rem);
+  font-size: clamp(2.5rem, 5vw, 4rem);
   font-weight: 700;
+  letter-spacing: -0.035em;
 }
 h2 {
-  font-size: clamp(1.875rem, 3.2vw, 2.75rem);
+  font-size: clamp(1.75rem, 3vw, 2.5rem);
+  letter-spacing: -0.03em;
 }
 h3 {
-  font-size: 1.25rem;
-  font-weight: 500;
+  font-size: 1.1875rem;
+  font-weight: 600;
+  letter-spacing: -0.015em;
 }
 
 .eyebrow {
@@ -206,10 +209,10 @@ section {
   align-items: center;
   gap: 0.6rem;
   color: var(--fg);
-  font-family: var(--font-display);
+  font-family: var(--font-sans);
   font-weight: 600;
-  font-size: 1.125rem;
-  letter-spacing: -0.01em;
+  font-size: 1.0625rem;
+  letter-spacing: -0.02em;
 }
 .brand:hover { color: var(--fg); }
 .brand-mark {
@@ -268,35 +271,36 @@ section {
   animation: drift 32s ease-in-out infinite;
   will-change: transform;
 }
+.orb { opacity: 0.5; } /* G2 leans cleaner — tone the glow back */
 .orb.emerald {
-  width: 520px; height: 520px;
-  background: radial-gradient(circle at 30% 30%, rgba(16, 185, 129, 0.55), transparent 65%);
+  width: 480px; height: 480px;
+  background: radial-gradient(circle at 30% 30%, rgba(16, 185, 129, 0.42), transparent 65%);
   top: -120px; left: -80px;
   animation-delay: -8s;
 }
 .orb.cyan {
-  width: 600px; height: 600px;
-  background: radial-gradient(circle at 40% 40%, rgba(34, 211, 238, 0.42), transparent 65%);
-  top: 80px; right: -160px;
+  width: 540px; height: 540px;
+  background: radial-gradient(circle at 40% 40%, rgba(34, 211, 238, 0.32), transparent 65%);
+  top: 60px; right: -160px;
   animation-delay: -16s;
   animation-duration: 38s;
 }
 .orb.violet {
-  width: 460px; height: 460px;
-  background: radial-gradient(circle at 50% 60%, rgba(167, 139, 250, 0.4), transparent 65%);
+  width: 420px; height: 420px;
+  background: radial-gradient(circle at 50% 60%, rgba(167, 139, 250, 0.3), transparent 65%);
   bottom: -180px; left: 35%;
   animation-delay: -22s;
   animation-duration: 44s;
 }
 
-.hero-bugle {
+.hero-trumpet {
   position: absolute;
-  font-size: clamp(18rem, 32vw, 32rem);
+  font-size: clamp(16rem, 30vw, 30rem);
   line-height: 1;
-  top: -2vw;
-  right: -6vw;
-  opacity: 0.07;
-  transform: rotate(-12deg);
+  top: -1vw;
+  right: -5vw;
+  opacity: 0.06;
+  transform: rotate(-10deg);
   filter: blur(0.5px);
   user-select: none;
   pointer-events: none;
@@ -534,7 +538,7 @@ section {
 }
 .rack-table tbody th {
   text-align: left;
-  font-family: var(--font-display);
+  font-family: var(--font-sans);
   font-weight: 600;
   font-size: 1rem;
   color: var(--fg);
@@ -698,7 +702,7 @@ section {
   background: radial-gradient(80% 60% at 0% 100%, var(--violet-soft), transparent 70%);
 }
 .grid-trust dt {
-  font-family: var(--font-display);
+  font-family: var(--font-sans);
   font-weight: 600;
   font-size: 1.125rem;
   color: var(--fg);
@@ -761,6 +765,231 @@ section {
 @media (prefers-reduced-motion: reduce) {
   .reveal { opacity: 1; transform: none; transition: none; }
 }
+
+/* --- social proof row (under hero) ----------------------------------- */
+
+.social-proof {
+  padding-block: clamp(2.5rem, 4vw, 3.5rem);
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  background: linear-gradient(180deg, rgba(255,255,255,0.012), transparent);
+}
+.social-proof-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 2rem;
+  flex-wrap: wrap;
+}
+.social-proof-label {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--fg-mute);
+  margin: 0;
+}
+.client-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1.25rem 2rem;
+}
+.client {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--fg-dim);
+  font-weight: 500;
+  font-size: 0.9375rem;
+  letter-spacing: -0.01em;
+  transition: color 0.2s;
+}
+.client:hover { color: var(--fg); }
+.client-mark {
+  width: 22px; height: 22px;
+  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-mono);
+  font-weight: 600;
+  font-size: 0.6875rem;
+  color: var(--bg);
+}
+.client-mark.cd { background: linear-gradient(135deg, #c87b56, #a85a3a); }
+.client-mark.cu { background: linear-gradient(135deg, #6b7180, #404552); color: var(--fg); }
+.client-mark.cc { background: linear-gradient(135deg, var(--emerald), #047857); }
+.client-mark.mcp { background: linear-gradient(135deg, var(--cyan), #0e7490); }
+
+/* --- capability tile grid ------------------------------------------- */
+
+.capabilities {
+  padding-block: clamp(4rem, 7vw, 6rem);
+}
+.cap-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 0.875rem;
+  margin-top: 1.5rem;
+}
+.cap-tile {
+  position: relative;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  padding: 1.5rem 1.25rem 1.25rem;
+  overflow: hidden;
+  transition: transform 0.22s ease, border-color 0.22s, background 0.22s;
+}
+.cap-tile::before {
+  content: "";
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 3px;
+  background: var(--tile-accent, var(--emerald));
+  opacity: 0.85;
+}
+.cap-tile::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(80% 60% at 100% 0%, color-mix(in oklab, var(--tile-accent, var(--emerald)) 12%, transparent), transparent 70%);
+  opacity: 0;
+  transition: opacity 0.22s;
+}
+.cap-tile:hover {
+  transform: translateY(-2px);
+  border-color: var(--tile-accent, var(--border-strong));
+}
+.cap-tile:hover::after { opacity: 1; }
+
+.cap-name {
+  font-family: var(--font-sans);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--tile-accent, var(--emerald));
+  margin: 0 0 0.5rem;
+  position: relative;
+  z-index: 1;
+}
+.cap-head {
+  font-family: var(--font-sans);
+  font-weight: 600;
+  font-size: 1.0625rem;
+  color: var(--fg);
+  margin: 0 0 0.875rem;
+  letter-spacing: -0.015em;
+  position: relative;
+  z-index: 1;
+}
+.cap-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  font-size: 0.8125rem;
+  margin: 0.35rem 0;
+  position: relative;
+  z-index: 1;
+}
+.cap-row .lbl {
+  color: var(--fg-mute);
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.cap-row .val {
+  color: var(--fg-dim);
+  font-weight: 500;
+  text-align: right;
+}
+.cap-row .val.free { color: var(--emerald); }
+.cap-row .val.paid { color: var(--amber); }
+
+.cap-tile.t-emerald { --tile-accent: var(--emerald); }
+.cap-tile.t-cyan    { --tile-accent: var(--cyan); }
+.cap-tile.t-violet  { --tile-accent: var(--violet); }
+.cap-tile.t-amber   { --tile-accent: var(--amber); }
+
+/* --- CTA banner (before footer) ------------------------------------- */
+
+.cta-banner {
+  padding-block: clamp(3rem, 6vw, 5rem);
+}
+.cta-banner-card {
+  position: relative;
+  background:
+    radial-gradient(80% 100% at 10% 0%, rgba(16,185,129,0.15), transparent 65%),
+    radial-gradient(70% 100% at 100% 100%, rgba(34,211,238,0.12), transparent 65%),
+    linear-gradient(160deg, var(--surface) 0%, var(--surface-2) 100%);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  padding: clamp(2rem, 4vw, 3rem);
+  overflow: hidden;
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+  gap: 2rem;
+  align-items: center;
+}
+@media (max-width: 720px) {
+  .cta-banner-card { grid-template-columns: 1fr; }
+}
+.cta-banner-card h2 {
+  font-size: clamp(1.5rem, 2.4vw, 2.125rem);
+  margin: 0 0 0.5rem;
+}
+.cta-banner-card p {
+  color: var(--fg-dim);
+  margin: 0 0 0;
+  font-size: 1rem;
+  max-width: 36em;
+}
+.cta-banner-actions {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+@media (max-width: 720px) {
+  .cta-banner-actions { justify-content: flex-start; }
+}
+
+/* --- badges row (general purpose) ----------------------------------- */
+
+.badges {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin: 1rem 0 1.5rem;
+}
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  padding: 0.35rem 0.7rem;
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  color: var(--fg-dim);
+  text-transform: lowercase;
+}
+.badge .dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--emerald);
+  box-shadow: 0 0 8px var(--emerald);
+}
+.badge.cyan .dot   { background: var(--cyan);   box-shadow: 0 0 8px var(--cyan); }
+.badge.violet .dot { background: var(--violet); box-shadow: 0 0 8px var(--violet); }
+.badge.amber .dot  { background: var(--amber);  box-shadow: 0 0 8px var(--amber); }
 
 /* --- scrollbar polish ------------------------------------------------ */
 
