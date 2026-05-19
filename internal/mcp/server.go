@@ -92,6 +92,11 @@ func (s *Server) ServeStdio(ctx context.Context) error {
 // Auth + rate-limit middleware can wrap the http.Handler at the caller's
 // discretion (Phase 1 PR 6 ports the proxy-era token check).
 func (s *Server) ServeHTTP(ctx context.Context, addr string) error {
+	addr = strings.TrimSpace(addr)
+	if addr == "" {
+		return fmt.Errorf("http serve: empty listen address")
+	}
+
 	handler := mcp.NewStreamableHTTPHandler(func(*http.Request) *mcp.Server {
 		return s.Inner
 	}, nil)

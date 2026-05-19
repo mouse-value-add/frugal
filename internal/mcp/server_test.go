@@ -62,6 +62,17 @@ func TestServer_InitializeAndEmptyToolsList(t *testing.T) {
 // JSON-RPC body — because the in-memory transport already covers the full
 // session lifecycle and StreamableHTTPHandler integration tests belong in
 // the SDK itself, not here.
+func TestServer_ServeHTTPRejectsEmptyAddress(t *testing.T) {
+	srv := New("frugal", "test-version", slog.New(slog.NewTextHandler(io.Discard, nil)))
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	err := srv.ServeHTTP(ctx, "   ")
+	if err == nil || !strings.Contains(err.Error(), "empty listen address") {
+		t.Fatalf("expected empty listen address error, got %v", err)
+	}
+}
+
 func TestServer_HTTPHandlerRespondsToInitialize(t *testing.T) {
 	srv := New("frugal", "test-version", slog.New(slog.NewTextHandler(io.Discard, nil)))
 
