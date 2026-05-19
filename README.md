@@ -1,4 +1,4 @@
-# frugal
+# frugal 🎺
 
 **Stop picking models. Pick the cheapest toolchain that completes the job.**
 
