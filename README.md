@@ -29,7 +29,7 @@ BYOK. Frugal reads provider credentials from your environment:
 
 ```bash
 export SERPER_API_KEY=...   # routed search
-export TAVILY_API_KEY=...   # routed search (cheaper paid alternative)
+export TAVILY_API_KEY=...   # routed search (premium fallback provider)
 ```
 
 That's it. Restart your agent. `frugal__search` shows up in the tool
