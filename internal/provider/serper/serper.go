@@ -16,6 +16,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/frugalsh/frugal/internal/routing"
 	"github.com/frugalsh/frugal/internal/search"
 )
 
@@ -55,9 +56,12 @@ func (c *Client) CostPerCall() float64 { return c.costPerCall }
 // Search runs one Serper search. The response's `organic` array maps to
 // search.Item; sitelinks, knowledge-graph cards, and ads are intentionally
 // dropped (eval can promote them back if data shows they materially help).
+// Transient HTTP / network failures are retried inside the driver via
+// routing.DoWithRetry; permanent failures (auth, bad query) surface
+// immediately as *routing.Error with Kind=Permanent.
 func (c *Client) Search(ctx context.Context, q search.Query) (search.Results, error) {
 	if q.Text == "" {
-		return search.Results{}, fmt.Errorf("serper: empty query")
+		return search.Results{}, routing.Permanent(c.Name(), 0, fmt.Errorf("empty query"))
 	}
 	num := q.MaxResults
 	if num <= 0 {
@@ -78,14 +82,27 @@ func (c *Client) Search(ctx context.Context, q search.Query) (search.Results, er
 			body.TBS = "qdr:m"
 		}
 	}
-
 	buf, err := json.Marshal(body)
 	if err != nil {
-		return search.Results{}, fmt.Errorf("serper: marshal request: %w", err)
+		return search.Results{}, routing.Permanent(c.Name(), 0, fmt.Errorf("marshal request: %w", err))
 	}
+
+	var out search.Results
+	err = routing.DoWithRetry(ctx, 1+len(routing.DefaultBackoff), routing.DefaultBackoff, func() error {
+		var attemptErr error
+		out, attemptErr = c.doOnce(ctx, buf)
+		return attemptErr
+	})
+	return out, err
+}
+
+// doOnce runs one HTTP attempt. The retry loop in Search wraps this; the
+// returned error is already classified into *routing.Error so
+// DoWithRetry can stop on permanent failures.
+func (c *Client) doOnce(ctx context.Context, buf []byte) (search.Results, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL+"/search", bytes.NewReader(buf))
 	if err != nil {
-		return search.Results{}, fmt.Errorf("serper: build request: %w", err)
+		return search.Results{}, routing.Permanent(c.Name(), 0, fmt.Errorf("build request: %w", err))
 	}
 	req.Header.Set("X-API-KEY", c.apiKey)
 	req.Header.Set("Content-Type", "application/json")
@@ -93,18 +110,25 @@ func (c *Client) Search(ctx context.Context, q search.Query) (search.Results, er
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return search.Results{}, fmt.Errorf("serper: %w", err)
+		return search.Results{}, &routing.Error{
+			Provider: c.Name(), Kind: routing.ClassifyNetwork(err), Err: err,
+		}
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
 		snippet, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
-		return search.Results{}, fmt.Errorf("serper: status %d: %s", resp.StatusCode, bytes.TrimSpace(snippet))
+		return search.Results{}, &routing.Error{
+			Provider: c.Name(),
+			Kind:     routing.ClassifyHTTPStatus(resp.StatusCode),
+			Status:   resp.StatusCode,
+			Err:      fmt.Errorf("%s", bytes.TrimSpace(snippet)),
+		}
 	}
 
 	var parsed serperResponse
 	if err := json.NewDecoder(resp.Body).Decode(&parsed); err != nil {
-		return search.Results{}, fmt.Errorf("serper: decode response: %w", err)
+		return search.Results{}, routing.Transient(c.Name(), resp.StatusCode, fmt.Errorf("decode response: %w", err))
 	}
 
 	items := make([]search.Item, 0, len(parsed.Organic))

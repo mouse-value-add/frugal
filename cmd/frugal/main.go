@@ -43,7 +43,10 @@ Common environment:
   FRUGAL_CONFIG                   Path to models.yaml (default: config/models.yaml)
   FRUGAL_LOG_LEVEL                debug | info | warn | error
   FRUGAL_LOG_FORMAT               text | json
-  TAVILY_API_KEY, SERPER_API_KEY  Search provider credentials
+  TAVILY_API_KEY, SERPER_API_KEY  Hosted search providers (paid)
+  SEARXNG_URL                     Self-hosted SearXNG instance (free, preferred when set)
+  FRUGAL_AUTH_TOKEN               Bearer token required by 'mcp serve --http'
+                                  (or pass --allow-anon for localhost / trusted-proxy use)
 
 See README.md for the full reference.`)
 }

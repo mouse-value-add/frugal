@@ -7,8 +7,10 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync/atomic"
 	"testing"
 
+	"github.com/frugalsh/frugal/internal/routing"
 	"github.com/frugalsh/frugal/internal/search"
 )
 
@@ -87,6 +89,34 @@ func TestSearch_HTTPErrorSurfacedWithSnippet(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "403") || !strings.Contains(err.Error(), "rate limit") {
 		t.Errorf("error should include status and snippet, got: %v", err)
+	}
+	if !routing.IsPermanent(err) {
+		t.Errorf("403 must classify as permanent; got %v", err)
+	}
+}
+
+func TestSearch_5xxClassifiedTransientAndRetried(t *testing.T) {
+	var calls atomic.Int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		n := calls.Add(1)
+		if n < 3 {
+			w.WriteHeader(http.StatusBadGateway)
+			_, _ = w.Write([]byte("upstream blip"))
+			return
+		}
+		_, _ = w.Write([]byte(`{"organic":[{"title":"recovered","link":"https://x","snippet":"hit"}]}`))
+	}))
+	defer srv.Close()
+	c := New("k", srv.URL, 0.0003)
+	res, err := c.Search(context.Background(), search.Query{Text: "x"})
+	if err != nil {
+		t.Fatalf("expected retry to recover; got %v", err)
+	}
+	if calls.Load() != 3 {
+		t.Errorf("expected 3 attempts; got %d", calls.Load())
+	}
+	if len(res.Items) != 1 || res.Items[0].Title != "recovered" {
+		t.Errorf("unexpected result after retry: %+v", res.Items)
 	}
 }
 

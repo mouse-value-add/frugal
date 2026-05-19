@@ -18,6 +18,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/frugalsh/frugal/internal/routing"
 	"github.com/frugalsh/frugal/internal/search"
 )
 
@@ -58,10 +59,13 @@ func (c *Client) CostPerCall() float64 { return c.costPerCall }
 
 // Search runs one Tavily search. Returns search.Results with the per-call
 // cost set to the configured price (Tavily doesn't return per-call cost in
-// the response).
+// the response). Transient HTTP / network failures are retried inside the
+// driver via routing.DoWithRetry; permanent failures (auth, bad query)
+// surface immediately as *routing.Error with Kind=Permanent.
 func (c *Client) Search(ctx context.Context, q search.Query) (search.Results, error) {
 	if q.Text == "" {
-		return search.Results{}, fmt.Errorf("tavily: empty query")
+		// Empty query is a caller bug — no point retrying or falling back.
+		return search.Results{}, routing.Permanent(c.Name(), 0, fmt.Errorf("empty query"))
 	}
 	max := q.MaxResults
 	if max <= 0 {
@@ -79,21 +83,36 @@ func (c *Client) Search(ctx context.Context, q search.Query) (search.Results, er
 	if q.Freshness != "" {
 		body.TimeRange = q.Freshness
 	}
-
 	buf, err := json.Marshal(body)
 	if err != nil {
-		return search.Results{}, fmt.Errorf("tavily: marshal request: %w", err)
+		return search.Results{}, routing.Permanent(c.Name(), 0, fmt.Errorf("marshal request: %w", err))
 	}
+
+	var out search.Results
+	err = routing.DoWithRetry(ctx, 1+len(routing.DefaultBackoff), routing.DefaultBackoff, func() error {
+		var attemptErr error
+		out, attemptErr = c.doOnce(ctx, buf)
+		return attemptErr
+	})
+	return out, err
+}
+
+// doOnce runs one HTTP attempt against Tavily. The retry loop in Search
+// wraps this; the returned error is already classified into
+// *routing.Error so DoWithRetry can stop on permanent failures.
+func (c *Client) doOnce(ctx context.Context, buf []byte) (search.Results, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL+"/search", bytes.NewReader(buf))
 	if err != nil {
-		return search.Results{}, fmt.Errorf("tavily: build request: %w", err)
+		return search.Results{}, routing.Permanent(c.Name(), 0, fmt.Errorf("build request: %w", err))
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "application/json")
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return search.Results{}, fmt.Errorf("tavily: %w", err)
+		return search.Results{}, &routing.Error{
+			Provider: c.Name(), Kind: routing.ClassifyNetwork(err), Err: err,
+		}
 	}
 	defer resp.Body.Close()
 
@@ -102,12 +121,19 @@ func (c *Client) Search(ctx context.Context, q search.Query) (search.Results, er
 		// type is JSON; otherwise the body is plain text. Cap the captured
 		// body so a verbose 500 doesn't leak into telemetry.
 		snippet, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
-		return search.Results{}, fmt.Errorf("tavily: status %d: %s", resp.StatusCode, bytes.TrimSpace(snippet))
+		return search.Results{}, &routing.Error{
+			Provider: c.Name(),
+			Kind:     routing.ClassifyHTTPStatus(resp.StatusCode),
+			Status:   resp.StatusCode,
+			Err:      fmt.Errorf("%s", bytes.TrimSpace(snippet)),
+		}
 	}
 
 	var parsed tavilyResponse
 	if err := json.NewDecoder(resp.Body).Decode(&parsed); err != nil {
-		return search.Results{}, fmt.Errorf("tavily: decode response: %w", err)
+		// 200 with malformed body is *probably* transient (provider hiccup,
+		// truncated response) — give the router one more shot before giving up.
+		return search.Results{}, routing.Transient(c.Name(), resp.StatusCode, fmt.Errorf("decode response: %w", err))
 	}
 
 	items := make([]search.Item, 0, len(parsed.Results))

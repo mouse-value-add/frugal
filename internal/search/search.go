@@ -11,7 +11,38 @@
 // scope for this package.
 package search
 
-import "context"
+import (
+	"context"
+	"time"
+)
+
+// Quoted is satisfied by providers that publish a recurring free-call
+// budget (Tavily's ~1k/month, You.com's developer tier, Exa's free tier,
+// etc.). The router prefers Quoted.EffectiveCostPerCall(now) over the
+// static CostPerCall() — so a premium provider sorts ahead of a cheaper
+// paid provider while its monthly quota holds, then falls back behind
+// once the quota exhausts.
+//
+// Implementing Quoted is optional. Drivers that don't (SearXNG,
+// Marginalia, Serper, also Tavily/You.com/Exa when the operator hasn't
+// configured a quota) keep their static CostPerCall() unchanged.
+type Quoted interface {
+	// EffectiveCostPerCall returns 0 while the provider is under its
+	// monthly free quota, and CostPerCall() once exhausted. `now` is
+	// passed in so tests can pin the clock — the driver also uses it to
+	// compare against its last seen month for rollover.
+	EffectiveCostPerCall(now time.Time) float64
+}
+
+// EffectiveCostOf returns s.EffectiveCostPerCall(now) if s implements
+// Quoted, otherwise s.CostPerCall(). Used by OrderByCost so all routing
+// decisions see the same effective price.
+func EffectiveCostOf(s Searcher, now time.Time) float64 {
+	if q, ok := s.(Quoted); ok {
+		return q.EffectiveCostPerCall(now)
+	}
+	return s.CostPerCall()
+}
 
 // Searcher is the contract every search-provider driver satisfies. Drivers
 // are independent of the MCP layer — they're plain Go clients that the

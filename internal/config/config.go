@@ -18,12 +18,21 @@ type Config struct {
 	SearchProviders map[string]SearchProviderConfig `yaml:"search_providers,omitempty"`
 }
 
-// SearchProviderConfig describes a routed search backend (Tavily, Serper, …).
-// The frugal__search MCP tool registers one entry per configured provider;
-// the auto-router picks the lowest CostPerCall among those with a key set.
+// SearchProviderConfig describes a routed search backend (Tavily, Serper,
+// SearXNG, …). The frugal__search MCP tool registers one entry per
+// provider whose credentials/endpoint are present at startup; the
+// auto-router picks the lowest CostPerCall among those.
+//
+// Providers split into two shapes:
+//
+//   - Hosted APIs (Tavily, Serper): need an API key. APIKeyEnv is set; the
+//     driver registers only if that env var is non-empty.
+//   - Self-hosted backends (SearXNG): no API key. APIKeyEnv is empty;
+//     BaseURLEnv (or BaseURL) supplies the endpoint the operator stood up.
 type SearchProviderConfig struct {
-	APIKeyEnv   string  `yaml:"api_key_env"`
+	APIKeyEnv   string  `yaml:"api_key_env,omitempty"`
 	BaseURL     string  `yaml:"base_url,omitempty"`
+	BaseURLEnv  string  `yaml:"base_url_env,omitempty"`
 	CostPerCall float64 `yaml:"cost_per_call"`
 }
 
@@ -56,8 +65,10 @@ func validate(cfg *Config) error {
 		if sp.CostPerCall < 0 {
 			return fmt.Errorf("search_providers.%s.cost_per_call must be non-negative", name)
 		}
-		if sp.APIKeyEnv == "" {
-			return fmt.Errorf("search_providers.%s.api_key_env is required", name)
+		// Either an API key env (hosted API) or a base URL (self-hosted) is
+		// required — without one we have no way to dispatch a call.
+		if sp.APIKeyEnv == "" && sp.BaseURL == "" && sp.BaseURLEnv == "" {
+			return fmt.Errorf("search_providers.%s: set api_key_env (hosted) or base_url / base_url_env (self-hosted)", name)
 		}
 	}
 	return nil

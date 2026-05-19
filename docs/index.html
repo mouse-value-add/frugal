@@ -5,9 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>frugal — tool calls are the new tokens</title>
   <meta name="description" content="For most agentic workloads, the tool bill exceeds the model bill. Frugal is the cost-arbitrage layer for tool calls — search, extract, browse, code-exec, embeddings — routed to a free/local provider first, falling back to the cheapest paid only when needed. Works with any model." />
-  <meta name="theme-color" content="#0a0a0b" media="(prefers-color-scheme: dark)" />
-  <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)" />
-  <meta name="color-scheme" content="dark light" />
+  <meta name="theme-color" content="#070709" />
+  <meta name="color-scheme" content="dark" />
 
   <meta property="og:type" content="website" />
   <meta property="og:url" content="https://frugal.sh/" />
@@ -21,6 +20,8 @@
 
   <link rel="canonical" href="https://frugal.sh/" />
   <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link rel="stylesheet" href="/styles.css" />
 
   <!-- Google tag (gtag.js) -->
@@ -29,7 +30,6 @@
     window.dataLayer = window.dataLayer || [];
     function gtag(){dataLayer.push(arguments);}
     gtag('js', new Date());
-
     gtag('config', 'G-N106Q6VFLM');
   </script>
 </head>
@@ -37,52 +37,62 @@
   <a class="skip" href="#main">Skip to content</a>
 
   <header class="top">
-    <a class="brand" href="/" aria-label="frugal home">
-      <span class="brand-mark" aria-hidden="true">f</span>
-      <span class="brand-name">frugal</span>
-    </a>
-    <nav class="top-nav" aria-label="Primary">
-      <a href="#rack-rates">Rack rates</a>
-      <a href="#surfaces">MCP</a>
-      <a href="#install">Install</a>
-      <a href="https://github.com/brainsparker/frugal" rel="noopener">GitHub</a>
-    </nav>
+    <div class="top-inner">
+      <a class="brand" href="/" aria-label="frugal home">
+        <span class="brand-mark" aria-hidden="true">📯</span>
+        <span class="brand-name">frugal</span>
+      </a>
+      <nav class="top-nav" aria-label="Primary">
+        <a href="#rack-rates">Rack rates</a>
+        <a href="#surfaces">MCP</a>
+        <a href="#install">Install</a>
+        <a class="nav-cta" href="https://github.com/brainsparker/frugal" rel="noopener">GitHub →</a>
+      </nav>
+    </div>
   </header>
 
   <main id="main">
     <section class="hero">
-      <div class="hero-grid">
-        <div class="hero-content">
-          <p class="eyebrow" aria-hidden="true">source-available · BYOK · any model</p>
+      <div class="hero-bg" aria-hidden="true">
+        <div class="orb emerald"></div>
+        <div class="orb cyan"></div>
+        <div class="orb violet"></div>
+        <span class="hero-bugle">📯</span>
+      </div>
 
-          <h1>
-            Tool calls are the
-            <span class="accent">new tokens.</span>
-          </h1>
-          <p class="lede">
-            Frugal routes every tool call your agent makes — search,
-            extract, browse, code-exec, embeddings — to a free or local
-            provider first, paid only as fallback, premium only when you
-            opt in. Drops into Claude Desktop, Cursor, Claude Code via
-            MCP. Your keys. No account.
-          </p>
+      <div class="shell">
+        <div class="hero-grid">
+          <div class="hero-content reveal">
+            <p class="eyebrow">source-available · byok · any model</p>
 
-          <div class="pills" role="list">
-            <span role="listitem">$0-first</span>
-            <span role="listitem">BYOK</span>
-            <span role="listitem">Any model</span>
+            <h1>
+              Tool calls are the
+              <span class="accent">new tokens.</span>
+            </h1>
+            <p class="lede">
+              Frugal routes every tool call your agent makes to the
+              cheapest provider that clears the bar.
+              <strong>Free / local first.</strong> Paid as fallback.
+              Drops into Claude Desktop, Cursor, Claude Code via MCP.
+              Your keys. No account.
+            </p>
+
+            <div class="pills" role="list">
+              <span role="listitem">$0-first</span>
+              <span role="listitem">BYOK</span>
+              <span role="listitem">Any model</span>
+            </div>
+
+            <div class="cta">
+              <a class="btn btn-primary" href="#install">Install →</a>
+              <a class="btn btn-ghost" href="#rack-rates">See the rate gap</a>
+            </div>
           </div>
 
-          <div class="cta">
-            <a class="btn btn-primary" href="#install">Install →</a>
-            <a class="btn btn-ghost" href="#rack-rates">See the rate gap</a>
-          </div>
-        </div>
-
-        <aside class="hero-aside" aria-label="Demo">
-          <div class="terminal" aria-label="Wire Frugal into your agent">
-            <div class="terminal-label"><span>wire it into your agent</span><span class="terminal-label-tag">mcp</span></div>
-            <pre class="terminal-body"><code><span class="prompt">$</span> frugal mcp install
+          <aside class="hero-aside reveal" aria-label="Demo">
+            <div class="terminal" aria-label="Wire Frugal into your agent">
+              <div class="terminal-label"><span>wire it into your agent</span><span class="terminal-label-tag">mcp</span></div>
+              <pre class="terminal-body"><code><span class="prompt">$</span> frugal mcp install
 <span class="muted">detected: Claude Desktop, Cursor, Claude Code
 ✓ wrote all three configs.</span>
 
@@ -91,171 +101,180 @@
 #   ↳ frugal__search → serper @ $0.0003
 #   ↳ gpt-4.1-nano synthesizes
 # done. cost: $0.0008</span></code></pre>
-            <button class="copy" type="button" data-copy="frugal mcp install" aria-label="Copy install example">Copy</button>
-          </div>
-        </aside>
+              <button class="copy" type="button" data-copy="frugal mcp install" aria-label="Copy install example">Copy</button>
+            </div>
+          </aside>
+        </div>
       </div>
     </section>
 
     <section class="rack-rates" id="rack-rates" aria-labelledby="rack-rates-heading">
-      <p class="section-label">The rack-rate gap</p>
-      <h2 id="rack-rates-heading">The cheapest tools for AI.</h2>
-      <p class="prose">
-        Tool prices haven't fallen the way model prices have. A Firecrawl
-        scrape costs as much as the gpt-4o-mini call that consumes it.
-        Tavily at $0.008/call is 8× Serper at $0.001/call. SearXNG,
-        running on your own machine, is free.
-        <strong>Frugal walks the columns left to right</strong> —
-        free / local first, cheap paid as fallback, premium paid only
-        when you opt in.
-      </p>
-      <div class="rack-table-wrap">
-        <table class="rack-table">
-          <thead>
-            <tr>
-              <th scope="col">Capability</th>
-              <th scope="col"><span class="status-tag tag-shipping">free / local</span></th>
-              <th scope="col"><span class="status-tag tag-partial">cheap paid</span></th>
-              <th scope="col"><span class="status-tag tag-planned">premium paid</span></th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <th scope="row">Search</th>
-              <td><strong>SearXNG</strong> (self-host)</td>
-              <td><strong>Serper</strong> · $0.001/call</td>
-              <td>You.com $0.005 · Exa $0.007 · Tavily $0.008</td>
-            </tr>
-            <tr>
-              <th scope="row">Extract</th>
-              <td><strong>Trafilatura</strong>, <strong>readability.js</strong>, <strong>Mercury</strong> (self-host)</td>
-              <td>—</td>
-              <td>Firecrawl $0.001–0.005/page</td>
-            </tr>
-            <tr>
-              <th scope="row">Browse</th>
-              <td><strong>Playwright</strong> + Chromium (local)</td>
-              <td>Browserless ~$0.002/unit (30s)</td>
-              <td>Browserbase $0.10/hr (~$0.002/min)</td>
-            </tr>
-            <tr>
-              <th scope="row">Code exec</th>
-              <td><strong>local Docker</strong></td>
-              <td>E2B ~$0.10/hr (2 vCPU)</td>
-              <td>Modal ~$0.14/hr (+GPU)</td>
-            </tr>
-            <tr>
-              <th scope="row">Embeddings</th>
-              <td><strong>nomic-embed-text</strong>, <strong>bge-large</strong> (local)</td>
-              <td>text-embedding-3-small · $0.02/1M tok</td>
-              <td>3-large, Voyage-3, Cohere</td>
-            </tr>
-            <tr>
-              <th scope="row">Transcription</th>
-              <td><strong>whisper.cpp</strong> (local)</td>
-              <td>Deepgram Nova · $0.0043/min</td>
-              <td>OpenAI Whisper $0.006/min, Speechmatics</td>
-            </tr>
-            <tr>
-              <th scope="row">Chat (small)</th>
-              <td><strong>Ollama / LM Studio</strong> (local OSS)</td>
-              <td>gpt-4o-mini, haiku, gemini-flash</td>
-              <td>gpt-4o, claude-sonnet</td>
-            </tr>
-            <tr>
-              <th scope="row">Chat (large)</th>
-              <td><strong>Kimi K2</strong>, <strong>Qwen 72B</strong> (serious local HW)</td>
-              <td>—</td>
-              <td>gpt-4o, claude-opus, gemini-pro</td>
-            </tr>
-          </tbody>
-        </table>
+      <div class="shell reveal">
+        <p class="section-label">The rack-rate gap</p>
+        <h2 id="rack-rates-heading">The cheapest tools for AI.</h2>
+        <p class="prose">
+          Tool prices haven't fallen the way model prices have. A
+          Firecrawl scrape costs as much as the gpt-4o-mini call that
+          consumes it. Tavily at $0.008/call is 8× Serper at $0.001.
+          SearXNG, on your own machine, is free.
+          <strong>Frugal walks the columns left to right</strong> —
+          free / local first, cheap paid as fallback, premium paid only
+          when you opt in.
+        </p>
+        <div class="rack-table-wrap">
+          <table class="rack-table">
+            <thead>
+              <tr>
+                <th scope="col">Capability</th>
+                <th scope="col"><span class="status-tag tag-shipping">free / local</span></th>
+                <th scope="col"><span class="status-tag tag-partial">cheap paid</span></th>
+                <th scope="col"><span class="status-tag tag-planned">premium paid</span></th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th scope="row">Search</th>
+                <td data-label="free / local"><strong>SearXNG</strong> (self-host)</td>
+                <td data-label="cheap paid"><strong>Serper</strong> · $0.001/call</td>
+                <td data-label="premium paid">You.com $0.005 · Exa $0.007 · Tavily $0.008</td>
+              </tr>
+              <tr>
+                <th scope="row">Extract</th>
+                <td data-label="free / local"><strong>Trafilatura</strong>, <strong>readability.js</strong>, <strong>Mercury</strong> (self-host)</td>
+                <td data-label="cheap paid">—</td>
+                <td data-label="premium paid">Firecrawl $0.001–0.005/page</td>
+              </tr>
+              <tr>
+                <th scope="row">Browse</th>
+                <td data-label="free / local"><strong>Playwright</strong> + Chromium (local)</td>
+                <td data-label="cheap paid">Browserless ~$0.002/unit (30s)</td>
+                <td data-label="premium paid">Browserbase $0.10/hr (~$0.002/min)</td>
+              </tr>
+              <tr>
+                <th scope="row">Code exec</th>
+                <td data-label="free / local"><strong>local Docker</strong></td>
+                <td data-label="cheap paid">E2B ~$0.10/hr (2 vCPU)</td>
+                <td data-label="premium paid">Modal ~$0.14/hr (+GPU)</td>
+              </tr>
+              <tr>
+                <th scope="row">Embeddings</th>
+                <td data-label="free / local"><strong>nomic-embed-text</strong>, <strong>bge-large</strong> (local)</td>
+                <td data-label="cheap paid">text-embedding-3-small · $0.02/1M tok</td>
+                <td data-label="premium paid">3-large, Voyage-3, Cohere</td>
+              </tr>
+              <tr>
+                <th scope="row">Transcription</th>
+                <td data-label="free / local"><strong>whisper.cpp</strong> (local)</td>
+                <td data-label="cheap paid">Deepgram Nova · $0.0043/min</td>
+                <td data-label="premium paid">OpenAI Whisper $0.006/min, Speechmatics</td>
+              </tr>
+              <tr>
+                <th scope="row">Chat (small)</th>
+                <td data-label="free / local"><strong>Ollama / LM Studio</strong> (local OSS)</td>
+                <td data-label="cheap paid">gpt-4o-mini, haiku, gemini-flash</td>
+                <td data-label="premium paid">gpt-4o, claude-sonnet</td>
+              </tr>
+              <tr>
+                <th scope="row">Chat (large)</th>
+                <td data-label="free / local"><strong>Kimi K2</strong>, <strong>Qwen 72B</strong> (serious local HW)</td>
+                <td data-label="cheap paid">—</td>
+                <td data-label="premium paid">gpt-4o, claude-opus, gemini-pro</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="prose rack-foot">
+          Every tool call prints the decision in the agent's tool trace:
+          capability, provider chosen, cost paid.
+        </p>
       </div>
-      <p class="prose rack-foot">
-        Every tool call prints the decision in the agent's tool trace:
-        capability, provider chosen, cost paid.
-      </p>
     </section>
 
     <section class="surfaces" id="surfaces" aria-labelledby="surfaces-heading">
-      <p class="section-label">The product</p>
-      <h2 id="surfaces-heading">One MCP server. That's it.</h2>
-      <p class="prose">
-        Agent stacks talk to Frugal via
-        <a href="https://modelcontextprotocol.io" rel="noopener">MCP</a> —
-        Claude Desktop, Cursor, Claude Code, any custom MCP host. Two
-        commands; no other surface.
-      </p>
-      <div class="code-grid">
-        <figure>
-          <figcaption>install into every detected agent</figcaption>
+      <div class="shell reveal">
+        <p class="section-label">The product</p>
+        <h2 id="surfaces-heading">One MCP server. That's it.</h2>
+        <p class="prose">
+          Agent stacks talk to Frugal via
+          <a href="https://modelcontextprotocol.io" rel="noopener">MCP</a> —
+          Claude Desktop, Cursor, Claude Code, any custom MCP host. Two
+          commands; no other surface. One binary, one config, every tool
+          call routed.
+        </p>
+        <div class="code-grid">
+          <figure>
+            <figcaption>install into every detected agent</figcaption>
 <pre><code><span class="prompt">$</span> frugal mcp install
 <span class="muted">detected: Claude Desktop, Cursor, Claude Code
 ✓ wrote all three configs.</span></code></pre>
-        </figure>
-        <figure>
-          <figcaption>run as an MCP server</figcaption>
+          </figure>
+          <figure>
+            <figcaption>run as an MCP server</figcaption>
 <pre><code><span class="prompt">$</span> frugal mcp serve
 <span class="muted">mcp ready on stdio. tools: frugal__search</span></code></pre>
-        </figure>
+          </figure>
+        </div>
       </div>
     </section>
 
     <section class="install-block" id="install" aria-labelledby="install-heading">
-      <p class="section-label">Get started</p>
-      <h2 id="install-heading">Install</h2>
-      <p class="prose">
-        One Go binary, ~10 MB. <strong>No SaaS. No account.</strong>
-        BYOK — Frugal reads <code>OPENAI_API_KEY</code>,
-        <code>ANTHROPIC_API_KEY</code>, <code>GOOGLE_API_KEY</code>,
-        <code>SERPER_API_KEY</code> from your environment and forwards
-        calls upstream. Releases are cosign-signed; the installer
-        verifies the checksum before moving the binary into place.
-      </p>
+      <div class="shell reveal">
+        <p class="section-label">Get started</p>
+        <h2 id="install-heading">Install</h2>
+        <p class="prose">
+          One Go binary, ~10 MB. <strong>No SaaS. No account.</strong>
+          BYOK — Frugal reads <code>OPENAI_API_KEY</code>,
+          <code>ANTHROPIC_API_KEY</code>, <code>GOOGLE_API_KEY</code>,
+          <code>SERPER_API_KEY</code> from your environment and forwards
+          calls upstream. Releases are cosign-signed; the installer
+          verifies the checksum before moving the binary into place.
+        </p>
 
-      <div class="terminal">
-        <pre class="terminal-body"><code><span class="prompt">$</span> curl -fsSL https://frugal.sh/install | bash</code></pre>
-        <button class="copy" type="button" data-copy="curl -fsSL https://frugal.sh/install | bash" aria-label="Copy install command">Copy</button>
-      </div>
+        <div class="terminal">
+          <pre class="terminal-body"><code><span class="prompt">$</span> curl -fsSL https://frugal.sh/install | bash</code></pre>
+          <button class="copy" type="button" data-copy="curl -fsSL https://frugal.sh/install | bash" aria-label="Copy install command">Copy</button>
+        </div>
 
-      <h3>From source</h3>
-      <div class="terminal compact">
-        <pre class="terminal-body"><code><span class="prompt">$</span> git clone https://github.com/brainsparker/frugal.git &amp;&amp; cd frugal &amp;&amp; make build</code></pre>
-      </div>
+        <h3>From source</h3>
+        <div class="terminal compact">
+          <pre class="terminal-body"><code><span class="prompt">$</span> git clone https://github.com/brainsparker/frugal.git &amp;&amp; cd frugal &amp;&amp; make build</code></pre>
+        </div>
 
-      <h3>Add Frugal to your agent</h3>
-      <div class="terminal compact">
-        <pre class="terminal-body"><code><span class="prompt">$</span> frugal mcp install
+        <h3>Add Frugal to your agent</h3>
+        <div class="terminal compact">
+          <pre class="terminal-body"><code><span class="prompt">$</span> frugal mcp install
 <span class="muted"># auto-detects Claude Desktop, Cursor, Claude Code.
 # merges 'frugal' into each detected config. idempotent.</span></code></pre>
+        </div>
       </div>
-
     </section>
 
     <section class="trust" aria-labelledby="trust-heading">
-      <p class="section-label">Trust</p>
-      <h2 id="trust-heading">Built to self-host</h2>
-      <dl class="grid grid-trust">
-        <div>
-          <dt>Your keys stay local</dt>
-          <dd>Provider API keys never leave your machine. No control
-          plane. <strong>No data retention by architecture.</strong></dd>
-        </div>
-        <div>
-          <dt>BUSL 1.1 → Apache 2.0</dt>
-          <dd>Source-available today; self-hosting and internal
-          commercial use are permitted. Each release converts to Apache
-          2.0 four years after publication.
-          <a href="https://github.com/brainsparker/frugal/blob/main/LICENSE-BUSL-FAQ.md" rel="noopener">License FAQ →</a></dd>
-        </div>
-      </dl>
+      <div class="shell reveal">
+        <p class="section-label">Trust</p>
+        <h2 id="trust-heading">Built to self-host.</h2>
+        <dl class="grid-trust">
+          <div>
+            <dt>Your keys stay local</dt>
+            <dd>Provider API keys never leave your machine. No control
+            plane. <strong>No data retention by architecture.</strong></dd>
+          </div>
+          <div>
+            <dt>BUSL 1.1 → Apache 2.0</dt>
+            <dd>Source-available today; self-hosting and internal
+            commercial use are permitted. Each release converts to Apache
+            2.0 four years after publication.
+            <a href="https://github.com/brainsparker/frugal/blob/main/LICENSE-BUSL-FAQ.md" rel="noopener">License FAQ →</a></dd>
+          </div>
+        </dl>
+      </div>
     </section>
   </main>
 
   <footer class="bottom">
     <div class="bottom-inner">
       <div>
-        <span class="brand-mark small" aria-hidden="true">f</span>
+        <span class="brand-mark small" aria-hidden="true">📯</span>
         <span>frugal.sh</span>
         <span class="bottom-sep" aria-hidden="true">·</span>
         <span>Created by <a href="https://sparker.co" rel="noopener">sparker.co</a></span>
@@ -270,8 +289,9 @@
   </footer>
 
   <script>
-    // Copy-to-clipboard for every button[data-copy]. Uses the async clipboard
-    // API and falls back to execCommand for pre-clipboard-API browsers.
+    // Copy-to-clipboard for every button[data-copy]. Uses the async
+    // clipboard API and falls back to execCommand for pre-clipboard-API
+    // browsers.
     document.querySelectorAll('button.copy[data-copy]').forEach(function (btn) {
       btn.addEventListener('click', async function () {
         var text = btn.dataset.copy;
@@ -292,6 +312,22 @@
         }, 1400);
       });
     });
+
+    // Section reveal on scroll — adds .in-view to each .reveal block as
+    // it enters the viewport. No-op when prefers-reduced-motion is set
+    // (the CSS already neutralizes the transform; the class still
+    // applies so opacity stays at 1).
+    var io = ('IntersectionObserver' in window) && new IntersectionObserver(function (entries) {
+      entries.forEach(function (e) {
+        if (e.isIntersecting) { e.target.classList.add('in-view'); io.unobserve(e.target); }
+      });
+    }, { rootMargin: '0px 0px -10% 0px', threshold: 0.05 });
+    if (io) {
+      document.querySelectorAll('.reveal').forEach(function (el) { io.observe(el); });
+    } else {
+      // Fallback for ancient browsers.
+      document.querySelectorAll('.reveal').forEach(function (el) { el.classList.add('in-view'); });
+    }
   </script>
 </body>
 </html>

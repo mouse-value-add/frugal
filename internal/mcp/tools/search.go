@@ -12,10 +12,12 @@ package tools
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"time"
 
 	sdkmcp "github.com/modelcontextprotocol/go-sdk/mcp"
 
+	"github.com/frugalsh/frugal/internal/obs"
 	"github.com/frugalsh/frugal/internal/search"
 )
 
@@ -50,9 +52,18 @@ type SearchOutput struct {
 // tools/list won't advertise something the server can't fulfill. That
 // distinction matters: agents query tools/list at session start and
 // shouldn't see ghost tools that always error.
-func RegisterSearch(server *sdkmcp.Server, searchers []search.Searcher) {
+//
+// Pass metrics (non-nil) to record per-provider call counts, error counts,
+// latency, and cost as each call lands. Nil metrics disables observability
+// but keeps the routing semantics identical.
+func RegisterSearch(server *sdkmcp.Server, searchers []search.Searcher, metrics *obs.Metrics) {
 	if len(searchers) == 0 {
 		return
+	}
+	if metrics != nil {
+		for _, s := range searchers {
+			metrics.EnsureProvider(s.Name())
+		}
 	}
 	desc := fmt.Sprintf(
 		"Run a web search routed across %s. Returns a list of {title, url, snippet} hits "+
@@ -70,49 +81,60 @@ func RegisterSearch(server *sdkmcp.Server, searchers []search.Searcher) {
 			IdempotentHint:  false, // search results can shift between calls
 			OpenWorldHint:   boolPtr(true),
 		},
-	}, makeSearchHandler(searchers))
+	}, makeSearchHandler(searchers, metrics))
 }
 
-func makeSearchHandler(searchers []search.Searcher) func(context.Context, *sdkmcp.CallToolRequest, SearchInput) (*sdkmcp.CallToolResult, SearchOutput, error) {
+func makeSearchHandler(searchers []search.Searcher, metrics *obs.Metrics) func(context.Context, *sdkmcp.CallToolRequest, SearchInput) (*sdkmcp.CallToolResult, SearchOutput, error) {
+	// Hook closes over metrics so every fallback attempt is recorded —
+	// not just the winner. Nil metrics skips recording, costing a comparison
+	// per call.
+	hook := search.AttemptHook(nil)
+	if metrics != nil {
+		hook = func(provider string, latency time.Duration, costUSD float64, err error) {
+			metrics.RecordCall(provider, latency, costUSD, err)
+		}
+	}
+
 	return func(ctx context.Context, _ *sdkmcp.CallToolRequest, in SearchInput) (*sdkmcp.CallToolResult, SearchOutput, error) {
 		if in.Query == "" {
 			return nil, SearchOutput{}, fmt.Errorf("frugal__search: query is required")
 		}
-		pick := pickSearcher(searchers, in.Provider)
-		if pick == nil {
-			if in.Provider != "" && in.Provider != "auto" {
-				return nil, SearchOutput{}, fmt.Errorf("frugal__search: provider %q not configured (configured: %s)", in.Provider, joinNames(searchers))
-			}
-			return nil, SearchOutput{}, fmt.Errorf("frugal__search: no search providers configured")
-		}
-		start := time.Now()
-		res, err := pick.Search(ctx, search.Query{
+		q := search.Query{
 			Text:       in.Query,
 			MaxResults: in.MaxResults,
 			Freshness:  in.Freshness,
-		})
+		}
+		logger := slog.Default()
+
+		start := time.Now()
+		var (
+			used search.Searcher
+			res  search.Results
+			err  error
+		)
+		if isAuto(in.Provider) {
+			used, res, err = search.CallWithFallback(ctx, searchers, q, logger, hook)
+		} else {
+			used, res, err = search.CallPinned(ctx, searchers, in.Provider, q, logger, hook)
+		}
 		latency := time.Since(start).Milliseconds()
 		if err != nil {
-			return nil, SearchOutput{}, err
+			return nil, SearchOutput{}, fmt.Errorf("frugal__search: %w", err)
 		}
-		return nil, SearchOutput{
+
+		out := SearchOutput{
 			Results:      res.Items,
 			CostUSD:      res.CostUSD,
-			ProviderUsed: pick.Name(),
+			ProviderUsed: used.Name(),
 			LatencyMS:    latency,
-		}, nil
+		}
+		return nil, out, nil
 	}
 }
 
-// pickSearcher resolves the per-call provider choice: explicit name wins,
-// "auto" / "" falls back to RouteCheapest, unknown explicit name returns
-// nil (handler emits a useful "not configured" error).
-func pickSearcher(searchers []search.Searcher, requested string) search.Searcher {
-	if requested == "" || requested == "auto" {
-		return search.RouteCheapest(searchers)
-	}
-	return search.Find(searchers, requested)
-}
+// isAuto reports whether the caller wants auto-routing (the default).
+// Empty string or the explicit sentinel "auto" both mean "pick for me."
+func isAuto(requested string) bool { return requested == "" || requested == "auto" }
 
 func joinNames(searchers []search.Searcher) string {
 	if len(searchers) == 0 {

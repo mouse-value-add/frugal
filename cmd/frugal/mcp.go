@@ -10,11 +10,14 @@ import (
 	"os/signal"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/frugalsh/frugal/internal/config"
 	"github.com/frugalsh/frugal/internal/install"
 	"github.com/frugalsh/frugal/internal/mcp"
 	"github.com/frugalsh/frugal/internal/mcp/tools"
+	"github.com/frugalsh/frugal/internal/obs"
+	"github.com/frugalsh/frugal/internal/provider/searxng"
 	"github.com/frugalsh/frugal/internal/provider/serper"
 	"github.com/frugalsh/frugal/internal/provider/tavily"
 	"github.com/frugalsh/frugal/internal/search"
@@ -54,11 +57,16 @@ func runMCPServe(args []string) int {
 	fs := flag.NewFlagSet("mcp serve", flag.ContinueOnError)
 	fs.SetOutput(os.Stderr)
 	httpAddr := fs.String("http", "", "if set, serve over Streamable HTTP on this address (e.g. :8765) instead of stdio")
+	allowAnon := fs.Bool("allow-anon", false, "permit --http to run without FRUGAL_AUTH_TOKEN (foot-gun: only for localhost or behind a trusted proxy)")
+	rateLimit := fs.Int("rate-limit-rpm", 600, "per-IP request budget per minute when serving --http (0 disables)")
+	reqTimeout := fs.Duration("request-timeout", 30*time.Second, "per-request timeout when serving --http (0 disables)")
 	fs.Usage = func() {
 		fmt.Fprintln(os.Stderr, "Usage: frugal mcp serve [--http ADDR]")
 		fmt.Fprintln(os.Stderr, "Run Frugal as an MCP server. Default transport is stdio")
 		fmt.Fprintln(os.Stderr, "(what Claude Desktop, Claude Code, and Cursor consume).")
 		fmt.Fprintln(os.Stderr, "Pass --http :PORT for Streamable HTTP (remote / HTTP clients).")
+		fmt.Fprintln(os.Stderr, "Set FRUGAL_AUTH_TOKEN to enable bearer-token auth, or pass --allow-anon")
+		fmt.Fprintln(os.Stderr, "to expose the server unauthenticated (localhost / trusted-proxy only).")
 		fmt.Fprintln(os.Stderr)
 		fs.PrintDefaults()
 	}
@@ -82,11 +90,12 @@ func runMCPServe(args []string) int {
 	// preserves the MCP newline-delimited JSON-RPC contract on stdout.
 	srv := mcp.New("frugal", version(), slog.Default())
 
+	metrics := obs.NewMetrics()
 	searchers := buildSearchers(cfg)
-	tools.RegisterSearch(srv.Inner, searchers)
+	tools.RegisterSearch(srv.Inner, searchers, metrics)
 	if len(searchers) == 0 {
 		slog.Warn("mcp serve: no search providers configured — frugal__search will not be advertised. " +
-			"Set TAVILY_API_KEY or SERPER_API_KEY to enable.")
+			"Set SEARXNG_URL (free, self-hosted), SERPER_API_KEY, or TAVILY_API_KEY to enable.")
 	} else {
 		names := make([]string, 0, len(searchers))
 		for _, s := range searchers {
@@ -98,8 +107,19 @@ func runMCPServe(args []string) int {
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer cancel()
 
+	// Periodic INFO dump of accumulated cost / latency / errors. Skipped
+	// on idle intervals so quiet sessions stay quiet.
+	go logMetricsPeriodically(ctx, metrics, 60*time.Second)
+
 	if *httpAddr != "" {
-		if err := srv.ServeHTTP(ctx, *httpAddr); err != nil {
+		opts := mcp.HTTPOptions{
+			AuthToken:          os.Getenv("FRUGAL_AUTH_TOKEN"),
+			AllowAnon:          *allowAnon,
+			RateLimitPerMinute: *rateLimit,
+			Metrics:            metrics,
+			RequestTimeout:     *reqTimeout,
+		}
+		if err := srv.ServeHTTP(ctx, *httpAddr, opts); err != nil {
 			fmt.Fprintf(os.Stderr, "frugal mcp serve: %v\n", err)
 			return 1
 		}
@@ -259,22 +279,70 @@ func confirm(question string) bool {
 	}
 }
 
+// logMetricsPeriodically dumps a Snapshot to slog every interval, but
+// skips intervals with no activity so a quiet stdio session doesn't spam
+// the log every minute. Stops when ctx is canceled.
+func logMetricsPeriodically(ctx context.Context, m *obs.Metrics, interval time.Duration) {
+	t := time.NewTicker(interval)
+	defer t.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-t.C:
+			if !m.HasActivity() {
+				continue
+			}
+			snap := m.Snapshot()
+			for _, p := range snap.Providers {
+				slog.Info("metrics",
+					"provider", p.Name,
+					"calls", p.Calls,
+					"errors", p.Errors,
+					"cost_usd", p.CostUSD,
+					"avg_latency_ms", p.AvgLatencyMS)
+			}
+			slog.Info("metrics_total", "cost_usd", snap.TotalCost)
+		}
+	}
+}
+
 // buildSearchers instantiates one search.Searcher per search_providers
-// entry that has its API-key env var set. Unknown provider names log a
-// warning and are skipped — operators can edit ~/.frugal/config/models.yaml
+// entry whose credentials/endpoint are present at startup. Hosted APIs
+// (Tavily, Serper) gate on their api_key_env; self-hosted backends
+// (SearXNG) gate on a non-empty base URL — resolved from base_url_env
+// first, falling back to the static base_url. Unknown provider names log
+// a warning and are skipped — operators can edit ~/.frugal/config/models.yaml
 // to add new providers, but driver wiring lives here in code.
 func buildSearchers(cfg *config.Config) []search.Searcher {
 	var out []search.Searcher
 	for name, sp := range cfg.SearchProviders {
-		key := os.Getenv(sp.APIKeyEnv)
-		if key == "" {
-			continue
+		key := ""
+		if sp.APIKeyEnv != "" {
+			key = os.Getenv(sp.APIKeyEnv)
+		}
+		base := sp.BaseURL
+		if sp.BaseURLEnv != "" {
+			if envBase := os.Getenv(sp.BaseURLEnv); envBase != "" {
+				base = envBase
+			}
 		}
 		switch name {
 		case "tavily":
-			out = append(out, tavily.New(key, sp.BaseURL, sp.CostPerCall))
+			if key == "" {
+				continue
+			}
+			out = append(out, tavily.New(key, base, sp.CostPerCall))
 		case "serper":
-			out = append(out, serper.New(key, sp.BaseURL, sp.CostPerCall))
+			if key == "" {
+				continue
+			}
+			out = append(out, serper.New(key, base, sp.CostPerCall))
+		case "searxng":
+			// Self-hosted; gate on base URL (no API key).
+			if c := searxng.New(base); c != nil {
+				out = append(out, c)
+			}
 		default:
 			slog.Warn("mcp serve: unknown search provider in config; ignoring",
 				"name", name, "hint", "add a driver in internal/provider/<name> and a switch case here")

@@ -6,11 +6,20 @@
 # v1.0 ships only the search-tool layer. Chat-model routing and its
 # pricing tables come back in Phase 2 with the frugal__chat MCP tool.
 search_providers:
-    tavily:
-        api_key_env: TAVILY_API_KEY
-        base_url: https://api.tavily.com
-        cost_per_call: 0.008
+    # Free / local-first: a self-hosted SearXNG instance. CostPerCall is 0
+    # so it sorts ahead of paid providers in the auto-router; the fallback
+    # chain catches us automatically if the instance is down. Operators
+    # set SEARXNG_URL to enable (https://docs.searxng.org/admin/installation.html).
+    searxng:
+        base_url_env: SEARXNG_URL
+        cost_per_call: 0.0
+    # Cheap paid fallback.
     serper:
         api_key_env: SERPER_API_KEY
         base_url: https://google.serper.dev
         cost_per_call: 0.001
+    # Premium paid fallback — better recall + LLM-tuned snippets.
+    tavily:
+        api_key_env: TAVILY_API_KEY
+        base_url: https://api.tavily.com
+        cost_per_call: 0.008

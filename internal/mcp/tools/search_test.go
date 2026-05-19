@@ -82,7 +82,7 @@ func TestRegisterSearch_ToolAppearsInToolsList(t *testing.T) {
 	srv := newServer()
 	RegisterSearch(srv, []search.Searcher{
 		&fakeSearcher{name: "fake", cost: 0.001},
-	})
+	}, nil)
 
 	client, cleanup := dialClient(t, srv)
 	defer cleanup()
@@ -101,7 +101,7 @@ func TestRegisterSearch_ToolAppearsInToolsList(t *testing.T) {
 
 func TestRegisterSearch_NoSearchersSkipsRegistration(t *testing.T) {
 	srv := newServer()
-	RegisterSearch(srv, nil)
+	RegisterSearch(srv, nil, nil)
 
 	client, cleanup := dialClient(t, srv)
 	defer cleanup()
@@ -125,7 +125,7 @@ func TestCallTool_RoutesToCheapest(t *testing.T) {
 		results: []search.Item{{Title: "CHEAP", URL: "https://cheap.example/x", Snippet: "hit"}},
 	}
 	srv := newServer()
-	RegisterSearch(srv, []search.Searcher{expensive, cheap})
+	RegisterSearch(srv, []search.Searcher{expensive, cheap}, nil)
 
 	client, cleanup := dialClient(t, srv)
 	defer cleanup()
@@ -168,7 +168,7 @@ func TestCallTool_ExplicitProviderOverridesAuto(t *testing.T) {
 		results: []search.Item{{Title: "CHEAP"}},
 	}
 	srv := newServer()
-	RegisterSearch(srv, []search.Searcher{expensive, cheap})
+	RegisterSearch(srv, []search.Searcher{expensive, cheap}, nil)
 
 	client, cleanup := dialClient(t, srv)
 	defer cleanup()
@@ -194,7 +194,7 @@ func TestCallTool_ExplicitProviderOverridesAuto(t *testing.T) {
 
 func TestCallTool_UnknownProviderErrors(t *testing.T) {
 	srv := newServer()
-	RegisterSearch(srv, []search.Searcher{&fakeSearcher{name: "only", cost: 0.001}})
+	RegisterSearch(srv, []search.Searcher{&fakeSearcher{name: "only", cost: 0.001}}, nil)
 
 	client, cleanup := dialClient(t, srv)
 	defer cleanup()
