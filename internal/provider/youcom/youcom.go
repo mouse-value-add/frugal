@@ -1,10 +1,17 @@
 // Package youcom implements a search.Searcher backed by the You.com
-// Search API (https://api.ydc-index.io).
+// Search API (https://ydc-index.io/v1/search).
 //
 // You.com is Frugal's premium search tier — LLM-tuned snippets and a
-// recurring monthly free-call quota make it the natural fallback when
-// the free / local providers don't return a result and Serper is
-// either rate-limited or out of quota.
+// $100 onboarding credit (~20,000 free calls at the $0.005 list price)
+// make it a natural fallback when the free / local providers don't
+// return a result and Serper is rate-limited or out of quota.
+//
+// Note: You.com also offers an MCP server at api.you.com/mcp with a
+// no-key free tier (?profile=free, 100 queries/day, search only). That
+// path bypasses this driver — agents can talk to it directly via MCP.
+// We could add a youcom-mcp Searcher that proxies through it for the
+// free-tier price (=0); deferred as a follow-up since it requires an
+// MCP-client implementation rather than a REST call.
 package youcom
 
 import (
@@ -22,8 +29,10 @@ import (
 	"github.com/frugalsh/frugal/internal/search"
 )
 
-// DefaultBaseURL is the You.com Search API production endpoint.
-const DefaultBaseURL = "https://api.ydc-index.io"
+// DefaultBaseURL is the You.com Search API production host. The full
+// endpoint is DefaultBaseURL + "/v1/search" per the docs at
+// https://you.com/docs/api-reference/search/v1-search.
+const DefaultBaseURL = "https://ydc-index.io"
 
 // Client implements search.Searcher against You.com.
 type Client struct {
@@ -82,7 +91,7 @@ func (c *Client) Search(ctx context.Context, q search.Query) (search.Results, er
 		// You.com freshness flag: "day" | "week" | "month" | "year".
 		params.Set("freshness", q.Freshness)
 	}
-	endpoint := c.baseURL + "/search?" + params.Encode()
+	endpoint := c.baseURL + "/v1/search?" + params.Encode()
 
 	var out search.Results
 	err := routing.DoWithRetry(ctx, 1+len(routing.DefaultBackoff), routing.DefaultBackoff, func() error {

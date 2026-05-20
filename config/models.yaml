@@ -25,11 +25,15 @@ search_providers:
         api_key_env: SERPER_API_KEY
         base_url: https://google.serper.dev
         cost_per_call: 0.001
-    # Premium paid fallback — LLM-tuned snippets + recurring monthly
-    # free quota (track via free-quota awareness when wired).
+    # Premium paid fallback — LLM-tuned snippets. List price is $0.005
+    # per call; new accounts get $100 in onboarding credit (~20,000
+    # calls before any charge). NOTE: You.com also offers an MCP
+    # server at api.you.com/mcp with a no-key free tier (100 queries/
+    # day at ?profile=free) — we don't proxy through it from this
+    # REST driver, but agents can hit it directly.
     youcom:
         api_key_env: YDC_API_KEY
-        base_url: https://api.ydc-index.io
+        base_url: https://ydc-index.io
         cost_per_call: 0.005
 
 # Extract providers consumed by the frugal__extract MCP tool. Same

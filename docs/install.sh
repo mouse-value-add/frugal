@@ -337,34 +337,46 @@ main() {
         fail "smoke test failed: $BIN_DIR/frugal --version did not exit cleanly" "$EXIT_VERIFY"
     fi
 
-    # Search key detection — informational only.
+    # Search provider detection — informational only. Marginalia ships
+    # always-on (public API, no key, no URL config), so even a fresh
+    # install has at least one search provider available out of the box.
     echo
-    info "detecting search-provider API keys..."
-    local keys=0
-    [ -n "${SEARXNG_URL:-}" ]    && { ok "SEARXNG_URL found";    keys=$((keys + 1)); }
-    [ -n "${SERPER_API_KEY:-}" ] && { ok "SERPER_API_KEY found"; keys=$((keys + 1)); }
-    [ -n "${YDC_API_KEY:-}" ]    && { ok "YDC_API_KEY found";    keys=$((keys + 1)); }
+    info "detecting search-provider config..."
+    local configured=0
+    # Marginalia is always available in the default models.yaml — no
+    # env var to detect, just announce it.
+    ok "Marginalia (free, public — always on)"
+    configured=$((configured + 1))
+    [ -n "${SEARXNG_URL:-}" ]    && { ok "SearXNG (\$SEARXNG_URL set)";    configured=$((configured + 1)); }
+    [ -n "${SERPER_API_KEY:-}" ] && { ok "Serper (\$SERPER_API_KEY set)";  configured=$((configured + 1)); }
+    [ -n "${YDC_API_KEY:-}" ]    && { ok "You.com (\$YDC_API_KEY set)";    configured=$((configured + 1)); }
     echo
     printf '\033[2m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\033[0m\n'
     echo
     printf '  \033[1;32m✓\033[0m  \033[1mfrugal.sh installed\033[0m  \033[2m·  %s  ·  %s\033[0m\n' "$version" "$platform"
     echo
 
-    if [ "$keys" -eq 0 ]; then
-        printf '  \033[1;33m⚠\033[0m  no search keys detected — frugal__search needs at least one.\n'
+    # Show the "add more providers" panel unless the user has at least
+    # one paid tier configured. Marginalia alone works — but a paid
+    # fallback is the honest recommendation for production use.
+    if [ -z "${SERPER_API_KEY:-}" ] && [ -z "${YDC_API_KEY:-}" ] && [ -z "${SEARXNG_URL:-}" ]; then
+        printf '  \033[1;33m⚠\033[0m  Only Marginalia is wired — fine for casual use, but consider adding\n'
+        printf '     a paid fallback for production. Frugal has no SaaS or account.\n'
         echo
-        printf '     \033[2mFrugal has no SaaS or account — use the keys you already have.\033[0m\n'
+        printf '  \033[2m─── \033[0m\033[1;36mAdd a provider\033[0m\033[2m ──────────────────────────────────────\033[0m\n'
         echo
-        printf '  \033[2m─── \033[0m\033[1;36mSet a key to start\033[0m\033[2m ──────────────────────────────\033[0m\n'
+        printf '  \033[1;32m▸\033[0m  SearXNG    \033[2m($0 — self-hosted instance URL, not a key)\033[0m\n'
+        printf '        \033[1m$\033[0m export SEARXNG_URL=https://your-searxng-instance/\n'
         echo
-        printf '  \033[1;32m▸\033[0m  SearXNG  \033[2m($0, self-hosted)\033[0m\n'
-        printf '        \033[1m$\033[0m export SEARXNG_URL=https://...\n'
+        printf '  \033[1;32m▸\033[0m  Serper     \033[2m($0.001/call list · 2,500 free credits on signup, no card)\033[0m\n'
+        printf '        \033[1m$\033[0m export SERPER_API_KEY=...   \033[2m(serper.dev)\033[0m\n'
         echo
-        printf '  \033[1;32m▸\033[0m  Serper   \033[2m($0.001/call, list)\033[0m\n'
-        printf '        \033[1m$\033[0m export SERPER_API_KEY=...\n'
+        printf '  \033[1;32m▸\033[0m  You.com    \033[2m($0.005/call list · $100 free credit on signup ~ 20k calls)\033[0m\n'
+        printf '        \033[1m$\033[0m export YDC_API_KEY=...      \033[2m(you.com/platform)\033[0m\n'
         echo
-        printf '  \033[1;32m▸\033[0m  You.com  \033[2m($0.005/call, list)\033[0m\n'
-        printf '        \033[1m$\033[0m export YDC_API_KEY=...\n'
+        printf '  \033[2m   You.com also offers an MCP server with 100 free queries/day, no\n'
+        printf '     key required — agents can hit api.you.com/mcp?profile=free directly.\n'
+        printf '     Useful path if you want a no-signup You.com option outside Frugal.\033[0m\n'
         echo
         printf '  Then wire frugal into your agent:\n'
         printf '        \033[1m$\033[0m frugal mcp install\n'

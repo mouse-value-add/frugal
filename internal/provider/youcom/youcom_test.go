@@ -16,7 +16,7 @@ import (
 
 func TestSearch_HappyPath(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/search" {
+		if r.URL.Path != "/v1/search" {
 			t.Errorf("unexpected path: %s", r.URL.Path)
 		}
 		if r.Header.Get("X-API-Key") != "ydc-test" {
