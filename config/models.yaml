@@ -31,3 +31,21 @@ search_providers:
         api_key_env: YDC_API_KEY
         base_url: https://api.ydc-index.io
         cost_per_call: 0.005
+
+# Extract providers consumed by the frugal__extract MCP tool. Same
+# routing rules as search: cheapest configured wins; transient errors
+# fall through; permanent (e.g. empty content → likely JS-rendered)
+# stop the chain and surface to the agent.
+extract_providers:
+    # Free / local: pure-Go Readability port. Fetches the URL with the
+    # operator's HTTP client and runs an in-process content-extraction
+    # pass. Returns Permanent on empty content (JS-rendered pages),
+    # which lets the router fall through to a paid driver.
+    goreadability:
+        cost_per_call: 0.0
+    # Premium paid: handles JS-rendered pages, anti-bot defenses, and
+    # PDF / binary content. Operators set FIRECRAWL_API_KEY to enable.
+    firecrawl:
+        api_key_env: FIRECRAWL_API_KEY
+        base_url: https://api.firecrawl.dev
+        cost_per_call: 0.001

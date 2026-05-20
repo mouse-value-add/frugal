@@ -1,0 +1,132 @@
+package tools
+
+import (
+	"context"
+	"fmt"
+	"log/slog"
+	"time"
+
+	sdkmcp "github.com/modelcontextprotocol/go-sdk/mcp"
+
+	"github.com/frugalsh/frugal/internal/extract"
+	"github.com/frugalsh/frugal/internal/obs"
+)
+
+// ExtractInput is the JSON-schema-generating shape for frugal__extract.
+// Field tags drive the schema the MCP client sees — keep names + descriptions
+// stable across releases, since agents pattern-match on them.
+type ExtractInput struct {
+	URL string `json:"url" jsonschema:"the URL to extract"`
+	// Formats picks which output fields the caller wants. Recognized:
+	// "markdown" (default), "html", "text". Drivers may opportunistically
+	// populate others.
+	Formats []string `json:"formats,omitempty" jsonschema:"output formats: markdown | html | text"`
+	// Provider pins the extract provider for this call ("goreadability",
+	// "firecrawl", …). Empty / "auto" → cheapest available wins.
+	Provider string `json:"provider,omitempty" jsonschema:"optional provider override: goreadability | firecrawl | auto"`
+}
+
+// ExtractOutput is the structured-content payload returned to the MCP
+// client. Markdown is the primary read; HTML / Text / Title / Byline /
+// Links are populated when the driver supplies them. CostUSD +
+// ProviderUsed + LatencyMS make the routing decision auditable.
+type ExtractOutput struct {
+	Markdown     string   `json:"markdown,omitempty"`
+	HTML         string   `json:"html,omitempty"`
+	Text         string   `json:"text,omitempty"`
+	Title        string   `json:"title,omitempty"`
+	Byline       string   `json:"byline,omitempty"`
+	Links        []string `json:"links,omitempty"`
+	CostUSD      float64  `json:"cost_usd"`
+	ProviderUsed string   `json:"provider_used"`
+	LatencyMS    int64    `json:"latency_ms"`
+}
+
+// RegisterExtract wires frugal__extract onto the given MCP server.
+// extractors is the operator-configured list. A no-op when empty —
+// no ghost tools in tools/list. Pass metrics (non-nil) to record
+// per-attempt call counts, errors, latency, and cost.
+func RegisterExtract(server *sdkmcp.Server, extractors []extract.Extractor, metrics *obs.Metrics) {
+	if len(extractors) == 0 {
+		return
+	}
+	if metrics != nil {
+		for _, e := range extractors {
+			metrics.EnsureProvider(e.Name())
+		}
+	}
+	desc := fmt.Sprintf(
+		"Extract the main article content from a URL, routed across %s. Returns "+
+			"markdown / html / text + metadata (title, byline). Provider choice "+
+			"defaults to the cheapest configured (typically a local Readability "+
+			"pass first, falling back to a paid scraper when the page needs JS).",
+		joinExtractorNames(extractors),
+	)
+	sdkmcp.AddTool(server, &sdkmcp.Tool{
+		Name:        "frugal__extract",
+		Title:       "Page extract (routed)",
+		Description: desc,
+		Annotations: &sdkmcp.ToolAnnotations{
+			ReadOnlyHint:    true,
+			DestructiveHint: boolPtr(false),
+			IdempotentHint:  true, // extracting the same URL twice should yield the same content
+			OpenWorldHint:   boolPtr(true),
+		},
+	}, makeExtractHandler(extractors, metrics))
+}
+
+func makeExtractHandler(extractors []extract.Extractor, metrics *obs.Metrics) func(context.Context, *sdkmcp.CallToolRequest, ExtractInput) (*sdkmcp.CallToolResult, ExtractOutput, error) {
+	hook := extract.AttemptHook(nil)
+	if metrics != nil {
+		hook = func(provider string, latency time.Duration, costUSD float64, err error) {
+			metrics.RecordCall(provider, latency, costUSD, err)
+		}
+	}
+
+	return func(ctx context.Context, _ *sdkmcp.CallToolRequest, in ExtractInput) (*sdkmcp.CallToolResult, ExtractOutput, error) {
+		if in.URL == "" {
+			return nil, ExtractOutput{}, fmt.Errorf("frugal__extract: url is required")
+		}
+		q := extract.Query{URL: in.URL, Formats: in.Formats}
+		logger := slog.Default()
+
+		start := time.Now()
+		var (
+			used extract.Extractor
+			res  extract.Result
+			err  error
+		)
+		if isAuto(in.Provider) {
+			used, res, err = extract.CallWithFallback(ctx, extractors, q, logger, hook)
+		} else {
+			used, res, err = extract.CallPinned(ctx, extractors, in.Provider, q, logger, hook)
+		}
+		latency := time.Since(start).Milliseconds()
+		if err != nil {
+			return nil, ExtractOutput{}, fmt.Errorf("frugal__extract: %w", err)
+		}
+
+		return nil, ExtractOutput{
+			Markdown:     res.Markdown,
+			HTML:         res.HTML,
+			Text:         res.Text,
+			Title:        res.Title,
+			Byline:       res.Byline,
+			Links:        res.Links,
+			CostUSD:      res.CostUSD,
+			ProviderUsed: used.Name(),
+			LatencyMS:    latency,
+		}, nil
+	}
+}
+
+func joinExtractorNames(extractors []extract.Extractor) string {
+	if len(extractors) == 0 {
+		return "(none)"
+	}
+	out := extractors[0].Name()
+	for _, e := range extractors[1:] {
+		out += ", " + e.Name()
+	}
+	return out
+}

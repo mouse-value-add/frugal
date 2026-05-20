@@ -17,6 +17,9 @@ import (
 	"github.com/frugalsh/frugal/internal/mcp"
 	"github.com/frugalsh/frugal/internal/mcp/tools"
 	"github.com/frugalsh/frugal/internal/obs"
+	"github.com/frugalsh/frugal/internal/extract"
+	"github.com/frugalsh/frugal/internal/provider/firecrawl"
+	"github.com/frugalsh/frugal/internal/provider/goreadability"
 	"github.com/frugalsh/frugal/internal/provider/marginalia"
 	"github.com/frugalsh/frugal/internal/provider/searxng"
 	"github.com/frugalsh/frugal/internal/provider/serper"
@@ -103,6 +106,16 @@ func runMCPServe(args []string) int {
 			names = append(names, s.Name())
 		}
 		slog.Info("mcp serve: frugal__search registered", "providers", names)
+	}
+
+	extractors := buildExtractors(cfg)
+	tools.RegisterExtract(srv.Inner, extractors, metrics)
+	if len(extractors) > 0 {
+		names := make([]string, 0, len(extractors))
+		for _, e := range extractors {
+			names = append(names, e.Name())
+		}
+		slog.Info("mcp serve: frugal__extract registered", "providers", names)
 	}
 
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
@@ -351,6 +364,40 @@ func buildSearchers(cfg *config.Config) []search.Searcher {
 			out = append(out, marginalia.New(base))
 		default:
 			slog.Warn("mcp serve: unknown search provider in config; ignoring",
+				"name", name, "hint", "add a driver in internal/provider/<name> and a switch case here")
+		}
+	}
+	return out
+}
+
+// buildExtractors instantiates one extract.Extractor per extract_providers
+// entry whose credentials/endpoint are present at startup. goreadability
+// is in-process and always available when listed in the YAML; firecrawl
+// gates on FIRECRAWL_API_KEY. Unknown names log a warning and are skipped.
+func buildExtractors(cfg *config.Config) []extract.Extractor {
+	var out []extract.Extractor
+	for name, sp := range cfg.ExtractProviders {
+		key := ""
+		if sp.APIKeyEnv != "" {
+			key = os.Getenv(sp.APIKeyEnv)
+		}
+		base := sp.BaseURL
+		if sp.BaseURLEnv != "" {
+			if envBase := os.Getenv(sp.BaseURLEnv); envBase != "" {
+				base = envBase
+			}
+		}
+		switch name {
+		case "goreadability":
+			// Pure-in-process — no key, no URL, always available.
+			out = append(out, goreadability.New())
+		case "firecrawl":
+			if key == "" {
+				continue
+			}
+			out = append(out, firecrawl.New(key, base, sp.CostPerCall))
+		default:
+			slog.Warn("mcp serve: unknown extract provider in config; ignoring",
 				"name", name, "hint", "add a driver in internal/provider/<name> and a switch case here")
 		}
 	}

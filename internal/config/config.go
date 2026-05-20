@@ -15,7 +15,8 @@ import (
 
 // Config is the on-disk model.yaml decoded.
 type Config struct {
-	SearchProviders map[string]SearchProviderConfig `yaml:"search_providers,omitempty"`
+	SearchProviders  map[string]SearchProviderConfig `yaml:"search_providers,omitempty"`
+	ExtractProviders map[string]SearchProviderConfig `yaml:"extract_providers,omitempty"`
 }
 
 // SearchProviderConfig describes a routed search backend (You.com,
@@ -61,15 +62,37 @@ func Load(path string) (*Config, error) {
 }
 
 func validate(cfg *Config) error {
-	for name, sp := range cfg.SearchProviders {
+	if err := validateProviders("search_providers", cfg.SearchProviders); err != nil {
+		return err
+	}
+	if err := validateProviders("extract_providers", cfg.ExtractProviders); err != nil {
+		return err
+	}
+	return nil
+}
+
+// validateProviders enforces the shared validity rules across any
+// capability-keyed provider map. Each entry must have a non-negative
+// cost and at least one of api_key_env (hosted) / base_url /
+// base_url_env (self-hosted). The goreadability extractor is the
+// special case: no API key, no base URL — it's a pure-in-process
+// driver. Allow it explicitly so the YAML can list it for visibility
+// without tripping validation.
+func validateProviders(scope string, providers map[string]SearchProviderConfig) error {
+	for name, sp := range providers {
 		if sp.CostPerCall < 0 {
-			return fmt.Errorf("search_providers.%s.cost_per_call must be non-negative", name)
+			return fmt.Errorf("%s.%s.cost_per_call must be non-negative", scope, name)
 		}
-		// Either an API key env (hosted API) or a base URL (self-hosted) is
-		// required — without one we have no way to dispatch a call.
-		if sp.APIKeyEnv == "" && sp.BaseURL == "" && sp.BaseURLEnv == "" {
-			return fmt.Errorf("search_providers.%s: set api_key_env (hosted) or base_url / base_url_env (self-hosted)", name)
+		if sp.APIKeyEnv != "" || sp.BaseURL != "" || sp.BaseURLEnv != "" {
+			continue
 		}
+		// Pure-in-process drivers that don't talk to a network endpoint
+		// don't need either field. Whitelist them.
+		switch name {
+		case "goreadability":
+			continue
+		}
+		return fmt.Errorf("%s.%s: set api_key_env (hosted) or base_url / base_url_env (self-hosted)", scope, name)
 	}
 	return nil
 }
