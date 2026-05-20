@@ -1,14 +1,5 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" aria-hidden="true">
-  <defs>
-    <radialGradient id="bg" cx="50%" cy="40%" r="60%">
-      <stop offset="0%" stop-color="#22d3ee" stop-opacity="0.55"/>
-      <stop offset="60%" stop-color="#10b981" stop-opacity="0.35"/>
-      <stop offset="100%" stop-color="#0a0a0b"/>
-    </radialGradient>
-  </defs>
-  <rect width="32" height="32" rx="7" fill="url(#bg)"/>
-  <rect width="32" height="32" rx="7" fill="#0a0a0b" fill-opacity="0.55"/>
-  <text x="16" y="24" text-anchor="middle"
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" aria-hidden="true">
+  <text x="50%" y="50%" dominant-baseline="central" text-anchor="middle"
         font-family="Apple Color Emoji, Segoe UI Emoji, Noto Color Emoji, sans-serif"
-        font-size="22">🎺</text>
+        font-size="86">🎺</text>
 </svg>
