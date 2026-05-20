@@ -17,7 +17,9 @@ import (
 	"github.com/frugalsh/frugal/internal/mcp"
 	"github.com/frugalsh/frugal/internal/mcp/tools"
 	"github.com/frugalsh/frugal/internal/obs"
+	"github.com/frugalsh/frugal/internal/browse"
 	"github.com/frugalsh/frugal/internal/extract"
+	"github.com/frugalsh/frugal/internal/provider/browserless"
 	"github.com/frugalsh/frugal/internal/provider/firecrawl"
 	"github.com/frugalsh/frugal/internal/provider/goreadability"
 	"github.com/frugalsh/frugal/internal/provider/marginalia"
@@ -116,6 +118,16 @@ func runMCPServe(args []string) int {
 			names = append(names, e.Name())
 		}
 		slog.Info("mcp serve: frugal__extract registered", "providers", names)
+	}
+
+	browsers := buildBrowsers(cfg)
+	tools.RegisterBrowse(srv.Inner, browsers, metrics)
+	if len(browsers) > 0 {
+		names := make([]string, 0, len(browsers))
+		for _, b := range browsers {
+			names = append(names, b.Name())
+		}
+		slog.Info("mcp serve: frugal__browse registered", "providers", names)
 	}
 
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
@@ -398,6 +410,36 @@ func buildExtractors(cfg *config.Config) []extract.Extractor {
 			out = append(out, firecrawl.New(key, base, sp.CostPerCall))
 		default:
 			slog.Warn("mcp serve: unknown extract provider in config; ignoring",
+				"name", name, "hint", "add a driver in internal/provider/<name> and a switch case here")
+		}
+	}
+	return out
+}
+
+// buildBrowsers instantiates one browse.Browser per browse_providers
+// entry whose credentials/endpoint are present at startup. Currently
+// only Browserless is supported; local Playwright is deferred.
+func buildBrowsers(cfg *config.Config) []browse.Browser {
+	var out []browse.Browser
+	for name, sp := range cfg.BrowseProviders {
+		key := ""
+		if sp.APIKeyEnv != "" {
+			key = os.Getenv(sp.APIKeyEnv)
+		}
+		base := sp.BaseURL
+		if sp.BaseURLEnv != "" {
+			if envBase := os.Getenv(sp.BaseURLEnv); envBase != "" {
+				base = envBase
+			}
+		}
+		switch name {
+		case "browserless":
+			if key == "" {
+				continue
+			}
+			out = append(out, browserless.New(key, base, sp.CostPerCall))
+		default:
+			slog.Warn("mcp serve: unknown browse provider in config; ignoring",
 				"name", name, "hint", "add a driver in internal/provider/<name> and a switch case here")
 		}
 	}

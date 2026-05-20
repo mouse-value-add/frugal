@@ -17,6 +17,7 @@ import (
 type Config struct {
 	SearchProviders  map[string]SearchProviderConfig `yaml:"search_providers,omitempty"`
 	ExtractProviders map[string]SearchProviderConfig `yaml:"extract_providers,omitempty"`
+	BrowseProviders  map[string]SearchProviderConfig `yaml:"browse_providers,omitempty"`
 }
 
 // SearchProviderConfig describes a routed search backend (You.com,
@@ -66,6 +67,9 @@ func validate(cfg *Config) error {
 		return err
 	}
 	if err := validateProviders("extract_providers", cfg.ExtractProviders); err != nil {
+		return err
+	}
+	if err := validateProviders("browse_providers", cfg.BrowseProviders); err != nil {
 		return err
 	}
 	return nil

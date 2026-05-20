@@ -46,6 +46,7 @@ Common environment:
   SERPER_API_KEY                  Cheap-paid web search (Serper)
   YDC_API_KEY                     Premium web search (You.com)
   FIRECRAWL_API_KEY               Premium extract (Firecrawl)
+  BROWSERLESS_TOKEN               Headless browse (Browserless)
   SEARXNG_URL                     Self-hosted SearXNG instance (free, preferred when set)
   FRUGAL_AUTH_TOKEN               Bearer token required by 'mcp serve --http'
                                   (or pass --allow-anon for localhost / trusted-proxy use)

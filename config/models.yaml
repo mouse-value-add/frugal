@@ -49,3 +49,15 @@ extract_providers:
         api_key_env: FIRECRAWL_API_KEY
         base_url: https://api.firecrawl.dev
         cost_per_call: 0.001
+
+# Browse providers consumed by the frugal__browse MCP tool. Use this
+# tool when the page needs JS execution to populate content (when
+# frugal__extract returns empty / "page likely requires JS").
+browse_providers:
+    # Hosted headless Chrome. Handles JS, anti-bot waits, custom wait-
+    # for selectors. Operators set BROWSERLESS_TOKEN to enable. Local
+    # Playwright is deferred (binary install friction).
+    browserless:
+        api_key_env: BROWSERLESS_TOKEN
+        base_url: https://chrome.browserless.io
+        cost_per_call: 0.002
