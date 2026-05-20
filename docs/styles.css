@@ -908,6 +908,40 @@ section {
   margin: 0 0 0.5rem;
   position: relative;
   z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* Status pill — tells the visitor at a glance which capabilities are
+   actually wired vs. still aspirational. */
+.cap-status {
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  padding: 0.1rem 0.45rem;
+  border-radius: 999px;
+  text-transform: lowercase;
+  color: var(--fg-mute);
+  background: rgba(15, 23, 42, 0.04);
+  border: 1px solid var(--border);
+}
+.cap-tile[data-status="shipping"] .cap-status {
+  color: var(--emerald);
+  background: var(--emerald-soft);
+  border-color: var(--emerald);
+}
+.cap-tile[data-status="partial"] .cap-status {
+  color: var(--amber);
+  background: var(--amber-soft);
+  border-color: var(--amber);
+}
+.cap-tile[data-status="planned"] {
+  opacity: 0.72;
+}
+.cap-tile[data-status="planned"]:hover {
+  opacity: 1;
 }
 .cap-head {
   font-family: var(--font-sans);

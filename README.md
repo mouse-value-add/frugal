@@ -28,47 +28,59 @@ configured MCP server list.
 BYOK. Frugal reads provider credentials from your environment:
 
 ```bash
-export SEARXNG_URL=...      # routed search (free, self-hosted)
-export SERPER_API_KEY=...   # routed search (cheap paid)
-export YDC_API_KEY=...      # routed search (premium paid, You.com)
+# Search — frugal__search
+export SEARXNG_URL=...           # free, self-hosted (also Marginalia free, no key)
+export SERPER_API_KEY=...        # cheap paid
+export YDC_API_KEY=...           # premium paid (You.com)
+
+# Extract — frugal__extract (goreadability is free, no key)
+export FIRECRAWL_API_KEY=...     # premium paid (JS-rendered pages)
+
+# Browse — frugal__browse
+export BROWSERLESS_TOKEN=...     # headless render
 ```
 
-That's it. Restart your agent. `frugal__search` shows up in the tool
-picker.
+That's it. Restart your agent. `frugal__search`, `frugal__extract`, and
+`frugal__browse` show up in the tool picker (only the tools whose
+providers are configured get registered).
 
 ## The rack-rate gap
 
 Tool prices haven't fallen the way model prices have. You.com at $0.005/call
 is 5× Serper at $0.001/call. SearXNG, running on your own machine, is free.
 
-| Capability | Free / local | Cheap paid | Premium paid |
-|---|---|---|---|
-| Search | SearXNG (self-host) | **Serper** $0.001/call | **You.com** $0.005/call |
-| Extract | Trafilatura, readability.js, Mercury | — | Firecrawl $0.001–0.005/page |
-| Browse | local Playwright + Chromium | Browserless ~$0.002/30s | Browserbase $0.10/hr |
-| Code exec | local Docker | E2B ~$0.10/hr (2 vCPU) | Modal |
-| Embeddings | nomic-embed-text, bge-large | text-embedding-3-small $0.02/1M tok | 3-large, Voyage-3, Cohere |
-| Transcription | whisper.cpp | Deepgram Nova $0.0043/min | OpenAI Whisper $0.006/min |
+| Capability | Free / local | Cheap paid | Premium paid | Status |
+|---|---|---|---|---|
+| Search | **SearXNG** · **Marginalia** | **Serper** $0.001/call | **You.com** $0.005/call | shipping |
+| Extract | **go-readability** (local) | — | **Firecrawl** $0.001/page | shipping |
+| Browse | local Playwright *(deferred)* | **Browserless** $0.002/render | Browserbase | partial |
+| Code exec | local Docker | E2B ~$0.10/hr (2 vCPU) | Modal | planned |
+| Embeddings | nomic-embed-text, bge-large | text-embedding-3-small $0.02/1M tok | 3-large, Voyage-3, Cohere | planned |
+| Transcription | whisper.cpp | Deepgram Nova $0.0043/min | OpenAI Whisper $0.006/min | planned |
 
 Frugal walks the columns left to right. Each tool call goes to the leftmost
-configured provider that clears the recipe's quality bar; you keep the gap.
+configured provider that returns a result; you keep the gap.
 
 ## What ships today
 
-Phase 1 v1.0 — one MCP server, one tool, three providers:
+One MCP server, three tools, seven providers:
 
-- `frugal__search` — routed search across **SearXNG** (free,
-  self-hosted), **Serper** (`$0.001/call`), and **You.com**
-  (`$0.005/call`).
+- **`frugal__search`** — routed across **SearXNG** (free, self-hosted),
+  **Marginalia** (free, public), **Serper** (`$0.001/call`), and
+  **You.com** (`$0.005/call`).
+- **`frugal__extract`** — routed across **go-readability** (free, pure-Go
+  local Readability) and **Firecrawl** (`~$0.001/page`, JS-rendered).
+- **`frugal__browse`** — **Browserless** (`~$0.002/render`, headless
+  Chrome). Local Playwright deferred.
 - Stdio + Streamable HTTP transports.
+- HTTP transport supports bearer-token auth (`FRUGAL_AUTH_TOKEN`),
+  per-IP rate limiting, and a `/metrics` endpoint (Prometheus text:
+  `frugal_calls_total{tool=,provider=}` etc.).
 - `frugal mcp install` writes the right config into Claude Desktop,
   Cursor, and Claude Code.
 
 ## What's coming
 
-- **Phase 2** — `frugal__extract` and `frugal__browse` with $0 / local
-  providers (SearXNG, Playwright, Trafilatura) and the free/local-first
-  routing rule that uses them.
 - **Phase 3** — embeddings, transcription, code execution, local chat
   models, semantic cache.
 - **Phase 4** — Frugal Cloud: hosted MCP endpoint for users who don't want
