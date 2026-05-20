@@ -136,7 +136,7 @@ func TestServeHTTP_MetricsEndpointBypassesAuth(t *testing.T) {
 		t.Errorf("/metrics status = %d, want 200", resp.StatusCode)
 	}
 	body, _ := io.ReadAll(resp.Body)
-	if !strings.Contains(string(body), "frugal_search_calls_total") {
+	if !strings.Contains(string(body), "frugal_calls_total") {
 		t.Errorf("/metrics body missing expected counter; got: %s", body)
 	}
 

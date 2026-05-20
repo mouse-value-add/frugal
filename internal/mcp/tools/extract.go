@@ -52,7 +52,7 @@ func RegisterExtract(server *sdkmcp.Server, extractors []extract.Extractor, metr
 	}
 	if metrics != nil {
 		for _, e := range extractors {
-			metrics.EnsureProvider(e.Name())
+			metrics.EnsureProvider(e.Name(), "extract")
 		}
 	}
 	desc := fmt.Sprintf(

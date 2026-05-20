@@ -11,7 +11,7 @@ import (
 
 func TestRecordCall_AggregatesPerProvider(t *testing.T) {
 	m := NewMetrics()
-	m.EnsureProvider("youcom")
+	m.EnsureProvider("youcom", "search")
 	m.RecordCall("youcom", 120*time.Millisecond, 0.008, nil)
 	m.RecordCall("youcom", 200*time.Millisecond, 0.008, nil)
 	m.RecordCall("youcom", 300*time.Millisecond, 0, errors.New("blip"))
@@ -46,7 +46,7 @@ func TestRecordCall_AggregatesPerProvider(t *testing.T) {
 
 func TestHasActivity(t *testing.T) {
 	m := NewMetrics()
-	m.EnsureProvider("youcom")
+	m.EnsureProvider("youcom", "search")
 	if m.HasActivity() {
 		t.Errorf("HasActivity should be false before any call")
 	}
@@ -118,9 +118,16 @@ func TestMonthlyCalls_ConcurrentSafe(t *testing.T) {
 
 func TestWritePrometheus(t *testing.T) {
 	m := NewMetrics()
+	// Register providers with their tools so the Prometheus output gets
+	// the right label. Tool label survives lazy-create (unregistered
+	// providers get tool="").
+	m.EnsureProvider("youcom", "search")
+	m.EnsureProvider("searxng", "search")
+	m.EnsureProvider("firecrawl", "extract")
 	m.RecordCall("youcom", 100*time.Millisecond, 0.008, nil)
 	m.RecordCall("youcom", 200*time.Millisecond, 0, errors.New("x"))
 	m.RecordCall("searxng", 20*time.Millisecond, 0, nil)
+	m.RecordCall("firecrawl", 400*time.Millisecond, 0.001, nil)
 
 	var buf bytes.Buffer
 	if err := m.WritePrometheus(&buf); err != nil {
@@ -129,20 +136,54 @@ func TestWritePrometheus(t *testing.T) {
 	out := buf.String()
 
 	mustContain := []string{
-		`# TYPE frugal_search_calls_total counter`,
-		`frugal_search_calls_total{provider="youcom"} 2`,
-		`frugal_search_calls_total{provider="searxng"} 1`,
-		`# TYPE frugal_search_errors_total counter`,
-		`frugal_search_errors_total{provider="youcom"} 1`,
-		`# TYPE frugal_search_cost_usd_total counter`,
-		`frugal_search_cost_usd_total{provider="youcom"} 0.008000`,
-		`frugal_search_cost_usd_total{provider="searxng"} 0.000000`,
-		`# TYPE frugal_search_latency_ms_avg gauge`,
-		`frugal_search_latency_ms_avg{provider="youcom"} 150`,
+		// Single family per metric type, tool+provider as labels.
+		`# TYPE frugal_calls_total counter`,
+		`frugal_calls_total{tool="search",provider="youcom"} 2`,
+		`frugal_calls_total{tool="search",provider="searxng"} 1`,
+		`frugal_calls_total{tool="extract",provider="firecrawl"} 1`,
+		`# TYPE frugal_errors_total counter`,
+		`frugal_errors_total{tool="search",provider="youcom"} 1`,
+		`# TYPE frugal_cost_usd_total counter`,
+		`frugal_cost_usd_total{tool="search",provider="youcom"} 0.008000`,
+		`frugal_cost_usd_total{tool="search",provider="searxng"} 0.000000`,
+		`frugal_cost_usd_total{tool="extract",provider="firecrawl"} 0.001000`,
+		`# TYPE frugal_latency_ms_avg gauge`,
+		`frugal_latency_ms_avg{tool="search",provider="youcom"} 150`,
+		`frugal_latency_ms_avg{tool="extract",provider="firecrawl"} 400`,
 	}
 	for _, want := range mustContain {
 		if !strings.Contains(out, want) {
 			t.Errorf("Prometheus output missing %q. Full output:\n%s", want, out)
 		}
+	}
+	// Old metric names must be gone — no frugal_search_* infix family.
+	if strings.Contains(out, "frugal_search_calls_total") {
+		t.Errorf("Old metric name frugal_search_calls_total should be removed; got:\n%s", out)
+	}
+}
+
+func TestEnsureProvider_TagsTool(t *testing.T) {
+	m := NewMetrics()
+	m.EnsureProvider("foo", "search")
+	m.RecordCall("foo", time.Millisecond, 0, nil)
+	snap := m.Snapshot()
+	if len(snap.Providers) != 1 || snap.Providers[0].Tool != "search" {
+		t.Errorf("expected tool=search; got %+v", snap.Providers)
+	}
+	// Re-EnsureProvider with a new tool is idempotent and updates.
+	m.EnsureProvider("foo", "extract")
+	snap = m.Snapshot()
+	if snap.Providers[0].Tool != "extract" {
+		t.Errorf("expected tool updated to extract; got %q", snap.Providers[0].Tool)
+	}
+}
+
+func TestRecordCall_UnregisteredProviderHasEmptyTool(t *testing.T) {
+	// Lazy-create path: RecordCall without EnsureProvider. Tool is "".
+	m := NewMetrics()
+	m.RecordCall("orphan", time.Millisecond, 0, nil)
+	snap := m.Snapshot()
+	if len(snap.Providers) != 1 || snap.Providers[0].Tool != "" {
+		t.Errorf("expected unregistered provider with empty tool; got %+v", snap.Providers)
 	}
 }

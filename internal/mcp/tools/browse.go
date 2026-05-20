@@ -46,7 +46,7 @@ func RegisterBrowse(server *sdkmcp.Server, browsers []browse.Browser, metrics *o
 	}
 	if metrics != nil {
 		for _, b := range browsers {
-			metrics.EnsureProvider(b.Name())
+			metrics.EnsureProvider(b.Name(), "browse")
 		}
 	}
 	desc := fmt.Sprintf(

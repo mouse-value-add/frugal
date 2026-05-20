@@ -34,10 +34,16 @@ type Metrics struct {
 // atomically updated on the hot path; Snapshot reads them with
 // LoadX/LoadInt64.
 //
+// Tool tags the capability the provider belongs to ("search", "extract",
+// "browse", …). Set once at registration via EnsureProvider so the
+// Prometheus output can group with a label rather than a metric-name
+// infix.
+//
 // MonthlyCalls is a separate counter that resets on calendar-month
 // rollover (UTC). It's the input the Quoted interface uses to decide
 // whether a provider is still inside its free quota.
 type ProviderStats struct {
+	Tool       string // capability label (set at EnsureProvider time)
 	Calls      atomic.Int64
 	Errors     atomic.Int64
 	LatencySum atomic.Int64 // milliseconds, summed across all calls (avg = sum/calls)
@@ -58,11 +64,19 @@ func NewMetrics() *Metrics {
 }
 
 // EnsureProvider registers a provider so its row exists in snapshots
-// even before any calls. Called once per registered Searcher at startup.
-func (m *Metrics) EnsureProvider(name string) {
+// even before any calls, and tags it with the capability it serves
+// ("search", "extract", "browse"). Called once per registered driver
+// at startup. If the provider already exists and tool is non-empty,
+// the tool label is updated (idempotent).
+func (m *Metrics) EnsureProvider(name, tool string) {
 	m.mu.Lock()
-	if _, ok := m.providers[name]; !ok {
-		m.providers[name] = &ProviderStats{}
+	ps, ok := m.providers[name]
+	if !ok {
+		ps = &ProviderStats{}
+		m.providers[name] = ps
+	}
+	if tool != "" {
+		ps.Tool = tool
 	}
 	m.mu.Unlock()
 }
@@ -144,6 +158,7 @@ type Snapshot struct {
 // ProviderSnapshot is one row in a Snapshot.
 type ProviderSnapshot struct {
 	Name         string
+	Tool         string // capability ("search", "extract", "browse")
 	Calls        int64
 	Errors       int64
 	CostUSD      float64
@@ -173,6 +188,7 @@ func (m *Metrics) Snapshot() Snapshot {
 		cost := float64(ps.CostMicro.Load()) / 1e6
 		out.Providers = append(out.Providers, ProviderSnapshot{
 			Name:         n,
+			Tool:         ps.Tool,
 			Calls:        calls,
 			Errors:       ps.Errors.Load(),
 			CostUSD:      cost,
@@ -200,55 +216,58 @@ func (m *Metrics) HasActivity() bool {
 // the binary stays free of a Prometheus client dep — four counters
 // don't justify pulling in github.com/prometheus/client_golang.
 //
-// Schema:
+// Schema (single family per metric type, tool + provider as labels —
+// scales as new capabilities land):
 //
-//	frugal_search_calls_total{provider="..."}      counter
-//	frugal_search_errors_total{provider="..."}     counter
-//	frugal_search_cost_usd_total{provider="..."}   counter
-//	frugal_search_latency_ms_avg{provider="..."}   gauge
+//	frugal_calls_total{tool="...",provider="..."}      counter
+//	frugal_errors_total{tool="...",provider="..."}     counter
+//	frugal_cost_usd_total{tool="...",provider="..."}   counter
+//	frugal_latency_ms_avg{tool="...",provider="..."}   gauge
+//
+// Providers registered without a tool label appear with tool="".
 func (m *Metrics) WritePrometheus(w io.Writer) error {
 	snap := m.Snapshot()
-	if _, err := fmt.Fprintln(w, "# HELP frugal_search_calls_total Total search calls per provider."); err != nil {
+	if _, err := fmt.Fprintln(w, "# HELP frugal_calls_total Total tool calls per (tool, provider)."); err != nil {
 		return err
 	}
-	if _, err := fmt.Fprintln(w, "# TYPE frugal_search_calls_total counter"); err != nil {
+	if _, err := fmt.Fprintln(w, "# TYPE frugal_calls_total counter"); err != nil {
 		return err
 	}
 	for _, p := range snap.Providers {
-		if _, err := fmt.Fprintf(w, "frugal_search_calls_total{provider=%q} %d\n", p.Name, p.Calls); err != nil {
+		if _, err := fmt.Fprintf(w, "frugal_calls_total{tool=%q,provider=%q} %d\n", p.Tool, p.Name, p.Calls); err != nil {
 			return err
 		}
 	}
-	if _, err := fmt.Fprintln(w, "# HELP frugal_search_errors_total Total search errors per provider."); err != nil {
+	if _, err := fmt.Fprintln(w, "# HELP frugal_errors_total Total tool errors per (tool, provider)."); err != nil {
 		return err
 	}
-	if _, err := fmt.Fprintln(w, "# TYPE frugal_search_errors_total counter"); err != nil {
+	if _, err := fmt.Fprintln(w, "# TYPE frugal_errors_total counter"); err != nil {
 		return err
 	}
 	for _, p := range snap.Providers {
-		if _, err := fmt.Fprintf(w, "frugal_search_errors_total{provider=%q} %d\n", p.Name, p.Errors); err != nil {
+		if _, err := fmt.Fprintf(w, "frugal_errors_total{tool=%q,provider=%q} %d\n", p.Tool, p.Name, p.Errors); err != nil {
 			return err
 		}
 	}
-	if _, err := fmt.Fprintln(w, "# HELP frugal_search_cost_usd_total Cumulative USD billed per provider."); err != nil {
+	if _, err := fmt.Fprintln(w, "# HELP frugal_cost_usd_total Cumulative USD billed per (tool, provider)."); err != nil {
 		return err
 	}
-	if _, err := fmt.Fprintln(w, "# TYPE frugal_search_cost_usd_total counter"); err != nil {
+	if _, err := fmt.Fprintln(w, "# TYPE frugal_cost_usd_total counter"); err != nil {
 		return err
 	}
 	for _, p := range snap.Providers {
-		if _, err := fmt.Fprintf(w, "frugal_search_cost_usd_total{provider=%q} %.6f\n", p.Name, p.CostUSD); err != nil {
+		if _, err := fmt.Fprintf(w, "frugal_cost_usd_total{tool=%q,provider=%q} %.6f\n", p.Tool, p.Name, p.CostUSD); err != nil {
 			return err
 		}
 	}
-	if _, err := fmt.Fprintln(w, "# HELP frugal_search_latency_ms_avg Average end-to-end latency in milliseconds."); err != nil {
+	if _, err := fmt.Fprintln(w, "# HELP frugal_latency_ms_avg Average end-to-end latency in milliseconds per (tool, provider)."); err != nil {
 		return err
 	}
-	if _, err := fmt.Fprintln(w, "# TYPE frugal_search_latency_ms_avg gauge"); err != nil {
+	if _, err := fmt.Fprintln(w, "# TYPE frugal_latency_ms_avg gauge"); err != nil {
 		return err
 	}
 	for _, p := range snap.Providers {
-		if _, err := fmt.Fprintf(w, "frugal_search_latency_ms_avg{provider=%q} %d\n", p.Name, p.AvgLatencyMS); err != nil {
+		if _, err := fmt.Fprintf(w, "frugal_latency_ms_avg{tool=%q,provider=%q} %d\n", p.Tool, p.Name, p.AvgLatencyMS); err != nil {
 			return err
 		}
 	}

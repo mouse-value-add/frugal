@@ -63,7 +63,7 @@ func RegisterSearch(server *sdkmcp.Server, searchers []search.Searcher, metrics 
 	}
 	if metrics != nil {
 		for _, s := range searchers {
-			metrics.EnsureProvider(s.Name())
+			metrics.EnsureProvider(s.Name(), "search")
 		}
 	}
 	desc := fmt.Sprintf(
