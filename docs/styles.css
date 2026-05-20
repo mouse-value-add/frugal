@@ -358,18 +358,6 @@ section {
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
 }
-.hero h1 .accent::after {
-  content: "";
-  display: inline-block;
-  width: 0.5ch;
-  height: 0.85em;
-  margin-left: 0.1ch;
-  background: var(--emerald);
-  vertical-align: -0.05em;
-  animation: blink 1.4s steps(1, end) infinite;
-}
-@keyframes blink { 50% { opacity: 0; } }
-
 .pills {
   display: flex;
   flex-wrap: wrap;
