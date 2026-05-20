@@ -62,7 +62,7 @@ func TestClassifyNetwork(t *testing.T) {
 }
 
 func TestIsTransientWithWrappedError(t *testing.T) {
-	inner := Transient("tavily", http.StatusServiceUnavailable, fmt.Errorf("upstream"))
+	inner := Transient("youcom", http.StatusServiceUnavailable, fmt.Errorf("upstream"))
 	wrapped := fmt.Errorf("frugal__search: %w", inner)
 	if !IsTransient(wrapped) {
 		t.Errorf("IsTransient should walk the error chain")
@@ -73,13 +73,13 @@ func TestIsTransientWithWrappedError(t *testing.T) {
 }
 
 func TestErrorFormatting(t *testing.T) {
-	e := Transient("tavily", 503, errors.New("upstream blip"))
-	want := "tavily: transient: status 503: upstream blip"
+	e := Transient("youcom", 503, errors.New("upstream blip"))
+	want := "youcom: transient: status 503: upstream blip"
 	if got := e.Error(); got != want {
 		t.Errorf("Error() = %q, want %q", got, want)
 	}
-	noStatus := Permanent("tavily", 0, errors.New("empty query"))
-	want2 := "tavily: permanent: empty query"
+	noStatus := Permanent("youcom", 0, errors.New("empty query"))
+	want2 := "youcom: permanent: empty query"
 	if got := noStatus.Error(); got != want2 {
 		t.Errorf("Error() = %q, want %q", got, want2)
 	}

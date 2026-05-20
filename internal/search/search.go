@@ -1,10 +1,11 @@
 // Package search defines the shared interface for routed web-search
-// providers (Tavily, Serper, …) and the data types the frugal__search MCP
-// tool exposes to clients.
+// providers (SearXNG, Serper, You.com, …) and the data types the
+// frugal__search MCP tool exposes to clients.
 //
-// Provider drivers (internal/provider/tavily, internal/provider/serper)
-// implement Searcher. The MCP tool handler in internal/mcp/tools picks one
-// at call-time using the routing rule documented on RouteCheapest.
+// Provider drivers (internal/provider/searxng, internal/provider/serper,
+// internal/provider/youcom) implement Searcher. The MCP tool handler in
+// internal/mcp/tools picks one at call-time using the routing rule
+// documented on RouteCheapest.
 //
 // All numeric costs are USD per call. Item published_at timestamps, when
 // available, are ISO-8601 strings — provider-specific parsing is out of
@@ -17,15 +18,14 @@ import (
 )
 
 // Quoted is satisfied by providers that publish a recurring free-call
-// budget (Tavily's ~1k/month, You.com's developer tier, Exa's free tier,
-// etc.). The router prefers Quoted.EffectiveCostPerCall(now) over the
-// static CostPerCall() — so a premium provider sorts ahead of a cheaper
-// paid provider while its monthly quota holds, then falls back behind
-// once the quota exhausts.
+// budget (You.com's developer tier, etc.). The router prefers
+// Quoted.EffectiveCostPerCall(now) over the static CostPerCall() — so a
+// premium provider sorts ahead of a cheaper paid provider while its
+// monthly quota holds, then falls back behind once the quota exhausts.
 //
-// Implementing Quoted is optional. Drivers that don't (SearXNG,
-// Marginalia, Serper, also Tavily/You.com/Exa when the operator hasn't
-// configured a quota) keep their static CostPerCall() unchanged.
+// Implementing Quoted is optional. Drivers that don't (SearXNG, Serper,
+// also You.com when the operator hasn't configured a quota) keep their
+// static CostPerCall() unchanged.
 type Quoted interface {
 	// EffectiveCostPerCall returns 0 while the provider is under its
 	// monthly free quota, and CostPerCall() once exhausted. `now` is
@@ -48,7 +48,7 @@ func EffectiveCostOf(s Searcher, now time.Time) float64 {
 // are independent of the MCP layer — they're plain Go clients that the
 // tool handler dispatches to.
 type Searcher interface {
-	// Name reports the provider's identifier ("tavily", "serper", …). Used
+	// Name reports the provider's identifier ("searxng", "serper", "youcom", …). Used
 	// in tool-result metadata and in error messages. Must be stable across
 	// releases — the recipe YAML uses these names in the `provider:` arg
 	// when a recipe author pins a specific provider.
@@ -72,7 +72,7 @@ type Query struct {
 	// Text is the search query (required).
 	Text string
 	// MaxResults caps the result list. Drivers may clamp to provider-side
-	// maxima (Tavily and Serper both top out around 20 today). Zero is
+	// maxima (Serper and You.com both top out around 20 today). Zero is
 	// interpreted as "driver default" (typically 5).
 	MaxResults int
 	// Freshness is an optional time-window hint ("day", "week", "month").
@@ -89,9 +89,9 @@ type Results struct {
 	CostUSD float64
 }
 
-// Item is one search hit. Fields mirror the union of what Tavily and Serper
-// reliably return; provider-specific extras (favicon, breadcrumb, type)
-// drop on the floor today and can be added when an eval shows they
+// Item is one search hit. Fields mirror the union of what the configured
+// providers reliably return; provider-specific extras (favicon, breadcrumb,
+// type) drop on the floor today and can be added when an eval shows they
 // materially change downstream answer quality.
 type Item struct {
 	Title       string `json:"title"`

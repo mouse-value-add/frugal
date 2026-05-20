@@ -112,7 +112,7 @@ func TestServeHTTP_RefusesAnonymousWithoutFlag(t *testing.T) {
 
 func TestServeHTTP_MetricsEndpointBypassesAuth(t *testing.T) {
 	m := obs.NewMetrics()
-	m.RecordCall("tavily", 100*time.Millisecond, 0.008, nil)
+	m.RecordCall("youcom", 100*time.Millisecond, 0.005, nil)
 
 	// Build the same handler chain ServeHTTP wires up so we can hit it
 	// through httptest without owning a real listener.

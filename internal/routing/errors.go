@@ -52,7 +52,7 @@ func (k Kind) String() string {
 // failures in one of these so the router can read .Kind without parsing
 // strings. Use Transient(...) / Permanent(...) constructors.
 type Error struct {
-	Provider string // "tavily", "serper", "searxng", …
+	Provider string // "searxng", "serper", "youcom", …
 	Kind     Kind
 	Status   int   // HTTP status code, or 0 if not an HTTP error
 	Err      error // underlying cause
@@ -60,7 +60,7 @@ type Error struct {
 
 // Error implements error. Format is intentionally compact:
 //
-//	tavily: transient: status 503: upstream timeout
+//	youcom: transient: status 503: upstream timeout
 func (e *Error) Error() string {
 	switch {
 	case e.Status != 0:

@@ -2,9 +2,10 @@
 // API (https://serper.dev) — a cheap-per-call Google SERP wrapper.
 //
 // Serper is the cost-optimized fallback: an order of magnitude cheaper per
-// call than Tavily, with raw title/snippet payload (no LLM-tuned content
-// summary). Frugal picks Serper for use cases where cost dominates and
-// title+snippet recall is enough (factual-qa, simple fresh-facts lookups).
+// call than the You.com premium tier, with raw title/snippet payload (no
+// LLM-tuned content summary). Frugal picks Serper for use cases where cost
+// dominates and title+snippet recall is enough (factual-qa, simple
+// fresh-facts lookups).
 package serper
 
 import (

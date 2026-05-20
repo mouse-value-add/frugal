@@ -28,8 +28,9 @@ configured MCP server list.
 BYOK. Frugal reads provider credentials from your environment:
 
 ```bash
-export SERPER_API_KEY=...   # routed search
-export TAVILY_API_KEY=...   # routed search (cheaper paid alternative)
+export SEARXNG_URL=...      # routed search (free, self-hosted)
+export SERPER_API_KEY=...   # routed search (cheap paid)
+export YDC_API_KEY=...      # routed search (premium paid, You.com)
 ```
 
 That's it. Restart your agent. `frugal__search` shows up in the tool
@@ -37,12 +38,12 @@ picker.
 
 ## The rack-rate gap
 
-Tool prices haven't fallen the way model prices have. Tavily at $0.008/call
-is 8× Serper at $0.001/call. SearXNG, running on your own machine, is free.
+Tool prices haven't fallen the way model prices have. You.com at $0.005/call
+is 5× Serper at $0.001/call. SearXNG, running on your own machine, is free.
 
 | Capability | Free / local | Cheap paid | Premium paid |
 |---|---|---|---|
-| Search | SearXNG (self-host) | **Serper** $0.001/call | You.com $0.005 · Exa $0.007 · Tavily $0.008 |
+| Search | SearXNG (self-host) | **Serper** $0.001/call | **You.com** $0.005/call |
 | Extract | Trafilatura, readability.js, Mercury | — | Firecrawl $0.001–0.005/page |
 | Browse | local Playwright + Chromium | Browserless ~$0.002/30s | Browserbase $0.10/hr |
 | Code exec | local Docker | E2B ~$0.10/hr (2 vCPU) | Modal |
@@ -54,10 +55,11 @@ configured provider that clears the recipe's quality bar; you keep the gap.
 
 ## What ships today
 
-Phase 1 v1.0 — one MCP server, one tool, two providers:
+Phase 1 v1.0 — one MCP server, one tool, three providers:
 
-- `frugal__search` — routed search across **Serper** (`$0.001/call`) and
-  **Tavily** (`$0.008/call`).
+- `frugal__search` — routed search across **SearXNG** (free,
+  self-hosted), **Serper** (`$0.001/call`), and **You.com**
+  (`$0.005/call`).
 - Stdio + Streamable HTTP transports.
 - `frugal mcp install` writes the right config into Claude Desktop,
   Cursor, and Claude Code.

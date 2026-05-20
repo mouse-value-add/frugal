@@ -11,10 +11,10 @@ import (
 
 func TestRecordCall_AggregatesPerProvider(t *testing.T) {
 	m := NewMetrics()
-	m.EnsureProvider("tavily")
-	m.RecordCall("tavily", 120*time.Millisecond, 0.008, nil)
-	m.RecordCall("tavily", 200*time.Millisecond, 0.008, nil)
-	m.RecordCall("tavily", 300*time.Millisecond, 0, errors.New("blip"))
+	m.EnsureProvider("youcom")
+	m.RecordCall("youcom", 120*time.Millisecond, 0.008, nil)
+	m.RecordCall("youcom", 200*time.Millisecond, 0.008, nil)
+	m.RecordCall("youcom", 300*time.Millisecond, 0, errors.New("blip"))
 	m.RecordCall("searxng", 30*time.Millisecond, 0, nil)
 
 	snap := m.Snapshot()
@@ -22,22 +22,22 @@ func TestRecordCall_AggregatesPerProvider(t *testing.T) {
 		t.Fatalf("expected 2 providers, got %d", len(snap.Providers))
 	}
 	// Sorted by name.
-	if snap.Providers[0].Name != "searxng" || snap.Providers[1].Name != "tavily" {
+	if snap.Providers[0].Name != "searxng" || snap.Providers[1].Name != "youcom" {
 		t.Errorf("provider order: %v", []string{snap.Providers[0].Name, snap.Providers[1].Name})
 	}
-	tav := snap.Providers[1]
-	if tav.Calls != 3 {
-		t.Errorf("tavily.Calls = %d, want 3", tav.Calls)
+	you := snap.Providers[1]
+	if you.Calls != 3 {
+		t.Errorf("youcom.Calls = %d, want 3", you.Calls)
 	}
-	if tav.Errors != 1 {
-		t.Errorf("tavily.Errors = %d, want 1", tav.Errors)
+	if you.Errors != 1 {
+		t.Errorf("youcom.Errors = %d, want 1", you.Errors)
 	}
-	if tav.CostUSD != 0.016 {
+	if you.CostUSD != 0.016 {
 		// Two successful 0.008 calls = 0.016; the error call's cost=0.
-		t.Errorf("tavily.CostUSD = %v, want 0.016", tav.CostUSD)
+		t.Errorf("youcom.CostUSD = %v, want 0.016", you.CostUSD)
 	}
-	if tav.AvgLatencyMS != (120+200+300)/3 {
-		t.Errorf("tavily.AvgLatencyMS = %d, want %d", tav.AvgLatencyMS, (120+200+300)/3)
+	if you.AvgLatencyMS != (120+200+300)/3 {
+		t.Errorf("youcom.AvgLatencyMS = %d, want %d", you.AvgLatencyMS, (120+200+300)/3)
 	}
 	if snap.TotalCost != 0.016 {
 		t.Errorf("TotalCost = %v, want 0.016", snap.TotalCost)
@@ -46,11 +46,11 @@ func TestRecordCall_AggregatesPerProvider(t *testing.T) {
 
 func TestHasActivity(t *testing.T) {
 	m := NewMetrics()
-	m.EnsureProvider("tavily")
+	m.EnsureProvider("youcom")
 	if m.HasActivity() {
 		t.Errorf("HasActivity should be false before any call")
 	}
-	m.RecordCall("tavily", time.Millisecond, 0.001, nil)
+	m.RecordCall("youcom", time.Millisecond, 0.001, nil)
 	if !m.HasActivity() {
 		t.Errorf("HasActivity should be true after a call")
 	}
@@ -58,11 +58,11 @@ func TestHasActivity(t *testing.T) {
 
 func TestMonthlyCalls_IncrementsAndIsolatesProviders(t *testing.T) {
 	m := NewMetrics()
-	m.RecordCall("tavily", time.Millisecond, 0.008, nil)
-	m.RecordCall("tavily", time.Millisecond, 0.008, nil)
+	m.RecordCall("youcom", time.Millisecond, 0.008, nil)
+	m.RecordCall("youcom", time.Millisecond, 0.008, nil)
 	m.RecordCall("serper", time.Millisecond, 0.001, nil)
-	if got := m.MonthlyCalls("tavily"); got != 2 {
-		t.Errorf("tavily MonthlyCalls = %d, want 2", got)
+	if got := m.MonthlyCalls("youcom"); got != 2 {
+		t.Errorf("youcom MonthlyCalls = %d, want 2", got)
 	}
 	if got := m.MonthlyCalls("serper"); got != 1 {
 		t.Errorf("serper MonthlyCalls = %d, want 1", got)
@@ -106,20 +106,20 @@ func TestMonthlyCalls_ConcurrentSafe(t *testing.T) {
 		go func() {
 			defer wg.Done()
 			for j := 0; j < perGoroutine; j++ {
-				m.RecordCall("tavily", time.Microsecond, 0.001, nil)
+				m.RecordCall("youcom", time.Microsecond, 0.001, nil)
 			}
 		}()
 	}
 	wg.Wait()
-	if got := m.MonthlyCalls("tavily"); got != goroutines*perGoroutine {
+	if got := m.MonthlyCalls("youcom"); got != goroutines*perGoroutine {
 		t.Errorf("MonthlyCalls = %d, want %d (no lost updates under contention)", got, goroutines*perGoroutine)
 	}
 }
 
 func TestWritePrometheus(t *testing.T) {
 	m := NewMetrics()
-	m.RecordCall("tavily", 100*time.Millisecond, 0.008, nil)
-	m.RecordCall("tavily", 200*time.Millisecond, 0, errors.New("x"))
+	m.RecordCall("youcom", 100*time.Millisecond, 0.008, nil)
+	m.RecordCall("youcom", 200*time.Millisecond, 0, errors.New("x"))
 	m.RecordCall("searxng", 20*time.Millisecond, 0, nil)
 
 	var buf bytes.Buffer
@@ -130,15 +130,15 @@ func TestWritePrometheus(t *testing.T) {
 
 	mustContain := []string{
 		`# TYPE frugal_search_calls_total counter`,
-		`frugal_search_calls_total{provider="tavily"} 2`,
+		`frugal_search_calls_total{provider="youcom"} 2`,
 		`frugal_search_calls_total{provider="searxng"} 1`,
 		`# TYPE frugal_search_errors_total counter`,
-		`frugal_search_errors_total{provider="tavily"} 1`,
+		`frugal_search_errors_total{provider="youcom"} 1`,
 		`# TYPE frugal_search_cost_usd_total counter`,
-		`frugal_search_cost_usd_total{provider="tavily"} 0.008000`,
+		`frugal_search_cost_usd_total{provider="youcom"} 0.008000`,
 		`frugal_search_cost_usd_total{provider="searxng"} 0.000000`,
 		`# TYPE frugal_search_latency_ms_avg gauge`,
-		`frugal_search_latency_ms_avg{provider="tavily"} 150`,
+		`frugal_search_latency_ms_avg{provider="youcom"} 150`,
 	}
 	for _, want := range mustContain {
 		if !strings.Contains(out, want) {

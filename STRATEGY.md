@@ -8,7 +8,7 @@
 
 For most agentic workloads in 2026, the tool bill exceeds the model bill.
 A single Firecrawl scrape costs as much as the gpt-4o-mini call that
-consumes its output. A Tavily search at $0.008/call is 8× a Serper search
+consumes its output. A You.com search at $0.005/call is 5× a Serper search
 at $0.001/call; a self-hosted SearXNG returns the same result for $0.
 An agent that loops on search → extract → reason × 10 iterations can run
 a $0.50 tool bill on top of a $0.005 model bill.
@@ -27,7 +27,7 @@ The AI infrastructure market splits cleanly:
 
 - **Model routing** (OpenRouter, LiteLLM, Helicone, Portkey) is crowded
   and converging on a few API gateways with thin margins.
-- **Tool providers** (Firecrawl, Tavily, Exa, Browserbase, You.com,
+- **Tool providers** (Firecrawl, Browserbase, You.com,
   Composio, Pipedream) compete on quality, recall, and latency — none
   compete on cost. Tool prices haven't fallen the way model prices have.
 - **Tool *routing*** is nearly empty. No one is routing tool calls
@@ -62,7 +62,7 @@ configured; users keep the gap.
 
 | Capability | Free / local ($0) | Cheap paid | Premium paid (avoid by default) |
 |---|---|---|---|
-| Search | **SearXNG** (self-host) | **Serper** ($0.001/call list) | **You.com** ($0.005), **Exa** ($0.007), **Tavily** ($0.008) |
+| Search | **SearXNG** (self-host) | **Serper** ($0.001/call list) | **You.com** ($0.005/call list) |
 | Extract | **Trafilatura**, **readability.js**, **Mercury** (self-host) | — | **Firecrawl** ($0.001–0.005/page) |
 | Browse | **Playwright** + Chromium (local) | **Browserless** (~$0.002/30s) | **Browserbase** ($0.10/hr, ~$0.002/min) |
 | Code-exec | **Local Docker** | **E2B** (~$0.10/hr, 2 vCPU) | Modal (~$0.14/hr CPU, +GPU rates) |
@@ -111,7 +111,7 @@ the tool-routing thesis.
 
 | Component | Free / local | Cheap paid | Premium paid | Status |
 |---|---|---|---|---|
-| Search | SearXNG | Serper | You.com, Exa, Tavily | **Serper + Tavily shipping; SearXNG Phase 2** |
+| Search | SearXNG | Serper | You.com | **Serper + You.com shipping; SearXNG Phase 2** |
 | Extract | Trafilatura, readability.js | — | Firecrawl | **Phase 2** |
 | Browse | local Playwright | Browserless | Browserbase | **Phase 2** |
 | Embeddings | nomic-embed, bge-large | text-embedding-3-small | 3-large, Voyage | **Phase 3** |
@@ -128,13 +128,13 @@ the cash register.
 | Tier | Form | Customer | Revenue mechanic |
 |---|---|---|---|
 | **OSS — Tier 0** | Self-hosted MCP server, BUSL 1.1 → Apache 2.0 | Local-first builders, evaluators, audit-friendly orgs | $0. Sells nothing; markets everything. |
-| **Frugal Cloud — Tier 1** *(planned)* | Hosted MCP endpoint at `api.frugal.sh`; Frugal-issued API key | Users who want the routing without operating SearXNG / Playwright / Trafilatura themselves | At-or-below the cheap-paid column. Frugal keeps the volume discount + the routing decision edge. **Competes with Tavily / Firecrawl / Browserbase on price**, not with OpenRouter on aggregation. |
+| **Frugal Cloud — Tier 1** *(planned)* | Hosted MCP endpoint at `api.frugal.sh`; Frugal-issued API key | Users who want the routing without operating SearXNG / Playwright / Trafilatura themselves | At-or-below the cheap-paid column. Frugal keeps the volume discount + the routing decision edge. **Competes with You.com / Firecrawl / Browserbase on price**, not with OpenRouter on aggregation. |
 | **Enterprise ZDR — Tier 2** *(planned)* | Customer self-hosts routing + dashboard inside their VPC; Frugal-the-company never sees their traffic | Regulated industries (fintech, healthcare, gov) | License + support contract. |
 
 The Cloud tier is deliberately *not* the OpenRouter shape. That market
 is crowded. Frugal Cloud is a **managed cheap-tools service** — search,
 extract, browse, embeddings, transcription routed across providers at
-list pricing, beating Tavily and Firecrawl on cost because Frugal both
+list pricing, beating You.com and Firecrawl on cost because Frugal both
 takes volume discounts and prefers free/local when configured.
 
 ## 9. Roadmap
@@ -171,7 +171,7 @@ The architectural unlock. Required for the bold $0 claim to be real.
 ## 10. TBD
 
 **Frugal Cloud pricing.** Pure pass-through at list price + keep the
-volume discount? Sub-list to undercut Tavily / Firecrawl directly?
+volume discount? Sub-list to undercut You.com / Firecrawl directly?
 Per-month subscription tiers? Resolve before Cloud launch.
 
 **Hardware for local-model dogfooding.** The showcase audience runs

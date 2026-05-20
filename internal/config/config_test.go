@@ -19,8 +19,8 @@ func TestLoad_StarterModelsYAMLLoads(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Load: %v", err)
 	}
-	if _, ok := cfg.SearchProviders["tavily"]; !ok {
-		t.Errorf("expected 'tavily' in SearchProviders, got %+v", cfg.SearchProviders)
+	if _, ok := cfg.SearchProviders["youcom"]; !ok {
+		t.Errorf("expected 'youcom' in SearchProviders, got %+v", cfg.SearchProviders)
 	}
 	if _, ok := cfg.SearchProviders["serper"]; !ok {
 		t.Errorf("expected 'serper' in SearchProviders, got %+v", cfg.SearchProviders)
@@ -50,7 +50,9 @@ func TestValidate_RejectsNegativeCost(t *testing.T) {
 	}
 }
 
-func TestValidate_RejectsMissingAPIKeyEnv(t *testing.T) {
+func TestValidate_RejectsMissingAPIKeyAndBaseURL(t *testing.T) {
+	// Either an api_key_env (hosted) or a base_url / base_url_env
+	// (self-hosted) is required — without one we have no way to dispatch.
 	dir := t.TempDir()
 	path := filepath.Join(dir, "cfg.yaml")
 	yaml := `search_providers:
@@ -61,7 +63,7 @@ func TestValidate_RejectsMissingAPIKeyEnv(t *testing.T) {
 		t.Fatal(err)
 	}
 	if _, err := Load(path); err == nil {
-		t.Fatalf("expected validation error for missing api_key_env")
+		t.Fatalf("expected validation error for missing api_key_env and base_url")
 	}
 }
 

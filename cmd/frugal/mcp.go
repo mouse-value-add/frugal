@@ -19,7 +19,7 @@ import (
 	"github.com/frugalsh/frugal/internal/obs"
 	"github.com/frugalsh/frugal/internal/provider/searxng"
 	"github.com/frugalsh/frugal/internal/provider/serper"
-	"github.com/frugalsh/frugal/internal/provider/tavily"
+	"github.com/frugalsh/frugal/internal/provider/youcom"
 	"github.com/frugalsh/frugal/internal/search"
 )
 
@@ -95,7 +95,7 @@ func runMCPServe(args []string) int {
 	tools.RegisterSearch(srv.Inner, searchers, metrics)
 	if len(searchers) == 0 {
 		slog.Warn("mcp serve: no search providers configured — frugal__search will not be advertised. " +
-			"Set SEARXNG_URL (free, self-hosted), SERPER_API_KEY, or TAVILY_API_KEY to enable.")
+			"Set SEARXNG_URL (free, self-hosted), SERPER_API_KEY, or YDC_API_KEY to enable.")
 	} else {
 		names := make([]string, 0, len(searchers))
 		for _, s := range searchers {
@@ -227,7 +227,7 @@ func runMCPInstall(args []string) int {
 	}
 	fmt.Fprintln(os.Stderr)
 	fmt.Fprintln(os.Stderr, "next steps:")
-	fmt.Fprintln(os.Stderr, "  1. set TAVILY_API_KEY and/or SERPER_API_KEY in the env where the agent runs")
+	fmt.Fprintln(os.Stderr, "  1. set SERPER_API_KEY and/or YDC_API_KEY in the env where the agent runs")
 	fmt.Fprintln(os.Stderr, "     (for Claude Desktop: add env vars to the same config; for Cursor: same)")
 	fmt.Fprintln(os.Stderr, "  2. restart the agent client to pick up the new MCP server")
 	fmt.Fprintln(os.Stderr, "  3. look for the 'frugal__search' tool in the agent's tool picker")
@@ -309,7 +309,7 @@ func logMetricsPeriodically(ctx context.Context, m *obs.Metrics, interval time.D
 
 // buildSearchers instantiates one search.Searcher per search_providers
 // entry whose credentials/endpoint are present at startup. Hosted APIs
-// (Tavily, Serper) gate on their api_key_env; self-hosted backends
+// (You.com, Serper) gate on their api_key_env; self-hosted backends
 // (SearXNG) gate on a non-empty base URL — resolved from base_url_env
 // first, falling back to the static base_url. Unknown provider names log
 // a warning and are skipped — operators can edit ~/.frugal/config/models.yaml
@@ -328,11 +328,11 @@ func buildSearchers(cfg *config.Config) []search.Searcher {
 			}
 		}
 		switch name {
-		case "tavily":
+		case "youcom":
 			if key == "" {
 				continue
 			}
-			out = append(out, tavily.New(key, base, sp.CostPerCall))
+			out = append(out, youcom.New(key, base, sp.CostPerCall))
 		case "serper":
 			if key == "" {
 				continue

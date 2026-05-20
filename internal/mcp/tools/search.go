@@ -28,11 +28,12 @@ type SearchInput struct {
 	Query      string `json:"query" jsonschema:"the search query"`
 	MaxResults int    `json:"max_results,omitempty" jsonschema:"max results to return (default 5, clamped to 20)"`
 	Freshness  string `json:"freshness,omitempty" jsonschema:"optional time window: day | week | month"`
-	// Provider pins the search provider for this call ("tavily", "serper", …).
-	// When empty or "auto", Frugal picks the cheapest configured provider.
-	// Recipe authors use this to override the default for use cases where the
-	// eval shows a more expensive provider has materially better recall.
-	Provider string `json:"provider,omitempty" jsonschema:"optional provider override: tavily | serper | auto"`
+	// Provider pins the search provider for this call ("searxng", "serper",
+	// "youcom", …). When empty or "auto", Frugal picks the cheapest
+	// configured provider. Recipe authors use this to override the default
+	// for use cases where the eval shows a more expensive provider has
+	// materially better recall.
+	Provider string `json:"provider,omitempty" jsonschema:"optional provider override: searxng | serper | youcom | auto"`
 }
 
 // SearchOutput is the structured-content payload returned to the MCP

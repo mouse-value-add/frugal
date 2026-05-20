@@ -341,8 +341,9 @@ main() {
     echo
     info "detecting search-provider API keys..."
     local keys=0
+    [ -n "${SEARXNG_URL:-}" ]    && { ok "SEARXNG_URL found";    keys=$((keys + 1)); }
     [ -n "${SERPER_API_KEY:-}" ] && { ok "SERPER_API_KEY found"; keys=$((keys + 1)); }
-    [ -n "${TAVILY_API_KEY:-}" ] && { ok "TAVILY_API_KEY found"; keys=$((keys + 1)); }
+    [ -n "${YDC_API_KEY:-}" ]    && { ok "YDC_API_KEY found";    keys=$((keys + 1)); }
     echo
     printf '\033[2m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\033[0m\n'
     echo
@@ -356,11 +357,14 @@ main() {
         echo
         printf '  \033[2m─── \033[0m\033[1;36mSet a key to start\033[0m\033[2m ──────────────────────────────\033[0m\n'
         echo
-        printf '  \033[1;32m▸\033[0m  Serper  \033[2m($0.001/call, list)\033[0m\n'
+        printf '  \033[1;32m▸\033[0m  SearXNG  \033[2m($0, self-hosted)\033[0m\n'
+        printf '        \033[1m$\033[0m export SEARXNG_URL=https://...\n'
+        echo
+        printf '  \033[1;32m▸\033[0m  Serper   \033[2m($0.001/call, list)\033[0m\n'
         printf '        \033[1m$\033[0m export SERPER_API_KEY=...\n'
         echo
-        printf '  \033[1;32m▸\033[0m  Tavily  \033[2m($0.008/call, list)\033[0m\n'
-        printf '        \033[1m$\033[0m export TAVILY_API_KEY=...\n'
+        printf '  \033[1;32m▸\033[0m  You.com  \033[2m($0.005/call, list)\033[0m\n'
+        printf '        \033[1m$\033[0m export YDC_API_KEY=...\n'
         echo
         printf '  Then wire frugal into your agent:\n'
         printf '        \033[1m$\033[0m frugal mcp install\n'
