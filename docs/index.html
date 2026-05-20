@@ -4,19 +4,19 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>frugal — tool calls are the new tokens</title>
-  <meta name="description" content="For most agentic workloads, the tool bill exceeds the model bill. Frugal is the cost-arbitrage layer for tool calls — search, extract, browse, code-exec, embeddings — routed to a free/local provider first, falling back to the cheapest paid only when needed. Works with any model." />
-  <meta name="theme-color" content="#070709" />
-  <meta name="color-scheme" content="dark" />
+  <meta name="description" content="The tool bill exceeds the model bill. Frugal routes every agent tool call — search, extract, browse, code-exec, embeddings — to the cheapest provider that returns a result. Free / local first. Paid as fallback. BYOK." />
+  <meta name="theme-color" content="#fafafa" />
+  <meta name="color-scheme" content="light" />
 
   <meta property="og:type" content="website" />
   <meta property="og:url" content="https://frugal.sh/" />
   <meta property="og:title" content="frugal — tool calls are the new tokens" />
-  <meta property="og:description" content="The tool bill exceeds the model bill. Frugal routes each tool call to the cheapest provider — free/local first (SearXNG, Playwright, Trafilatura), cheap paid (Serper) as fallback, premium (Tavily, You.com, Firecrawl) only when opted in. Any model. Open-router style, for tools." />
+  <meta property="og:description" content="The tool bill exceeds the model bill. Frugal routes every tool call to the cheapest provider that returns a result. SearXNG / Trafilatura / Playwright free. Serper cheap. Tavily / Firecrawl / Browserbase as fallback. Any model. BYOK." />
   <meta property="og:site_name" content="frugal.sh" />
 
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:title" content="frugal — tool calls are the new tokens" />
-  <meta name="twitter:description" content="Cost-arbitrage MCP server for agentic tool calls. $0-first routing. Any model. BYOK." />
+  <meta name="twitter:description" content="The MCP server that routes every tool call to the cheapest provider. $0-first. Any model. BYOK." />
 
   <link rel="canonical" href="https://frugal.sh/" />
   <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
@@ -70,11 +70,9 @@
               <span class="accent">new tokens.</span>
             </h1>
             <p class="lede">
-              Frugal routes every tool call your agent makes to the
-              cheapest provider that clears the bar.
-              <strong>Free / local first.</strong> Paid as fallback.
-              Drops into Claude Desktop, Cursor, Claude Code via MCP.
-              Your keys. No account.
+              Routes every tool call to the cheapest provider that
+              returns a result. <strong>Free / local first.</strong>
+              Paid as fallback. Your keys. No account.
             </p>
 
             <div class="pills" role="list">
@@ -93,14 +91,12 @@
             <div class="terminal" aria-label="Wire Frugal into your agent">
               <div class="terminal-label"><span>wire it into your agent</span><span class="terminal-label-tag">mcp</span></div>
               <pre class="terminal-body"><code><span class="prompt">$</span> frugal mcp install
-<span class="muted">detected: Claude Desktop, Cursor, Claude Code
-✓ wrote all three configs.</span>
+<span class="muted">✓ wired into Claude Desktop, Cursor, Claude Code.</span>
 
-<span class="muted"># Then, in Claude Code:
-# &gt; current iPhone prices?
-#   ↳ frugal__search → serper @ $0.0003
-#   ↳ gpt-4.1-nano synthesizes
-# done. cost: $0.0008</span></code></pre>
+<span class="muted"># &gt; current iPhone prices?
+#   frugal__search → serper · $0.0003
+#   gpt-4.1-nano synthesizes
+# done. total: $0.0008</span></code></pre>
               <button class="copy" type="button" data-copy="frugal mcp install" aria-label="Copy install example">Copy</button>
             </div>
           </aside>
@@ -125,9 +121,8 @@
         <p class="section-label">Capabilities</p>
         <h2 id="capabilities-heading">Every tool call, routed.</h2>
         <p class="prose">
-          Eight capabilities, three tiers each. Frugal walks them left to
-          right — free / local first, cheap paid as fallback, premium
-          paid only when you opt in.
+          Eight capabilities. Three tiers each. Walked left to right —
+          free first, paid as fallback.
         </p>
         <div class="cap-grid">
           <article class="cap-tile t-emerald">
@@ -195,13 +190,10 @@
         <p class="section-label">The rack-rate gap</p>
         <h2 id="rack-rates-heading">The cheapest tools for AI.</h2>
         <p class="prose">
-          Tool prices haven't fallen the way model prices have. A
-          Firecrawl scrape costs as much as the gpt-4o-mini call that
-          consumes it. Tavily at $0.008/call is 8× Serper at $0.001.
-          SearXNG, on your own machine, is free.
-          <strong>Frugal walks the columns left to right</strong> —
-          free / local first, cheap paid as fallback, premium paid only
-          when you opt in.
+          Tool prices haven't fallen the way model prices have. Tavily
+          is 8× Serper. A Firecrawl scrape costs as much as the
+          gpt-4o-mini call that consumes it. SearXNG, on your machine,
+          is free. <strong>Frugal takes the cheapest result.</strong>
         </p>
         <div class="rack-table-wrap">
           <table class="rack-table">
@@ -266,8 +258,8 @@
           </table>
         </div>
         <p class="prose rack-foot">
-          Every tool call prints the decision in the agent's tool trace:
-          capability, provider chosen, cost paid.
+          Every call prints the decision — capability, provider, cost —
+          in the agent's trace.
         </p>
       </div>
     </section>
@@ -277,11 +269,9 @@
         <p class="section-label">The product</p>
         <h2 id="surfaces-heading">One MCP server. That's it.</h2>
         <p class="prose">
-          Agent stacks talk to Frugal via
-          <a href="https://modelcontextprotocol.io" rel="noopener">MCP</a> —
-          Claude Desktop, Cursor, Claude Code, any custom MCP host. Two
-          commands; no other surface. One binary, one config, every tool
-          call routed.
+          Agents talk to Frugal via
+          <a href="https://modelcontextprotocol.io" rel="noopener">MCP</a>.
+          Two commands. No other surface.
         </p>
         <div class="code-grid">
           <figure>
@@ -305,11 +295,11 @@
         <h2 id="install-heading">Install</h2>
         <p class="prose">
           One Go binary, ~10 MB. <strong>No SaaS. No account.</strong>
-          BYOK — Frugal reads <code>OPENAI_API_KEY</code>,
-          <code>ANTHROPIC_API_KEY</code>, <code>GOOGLE_API_KEY</code>,
-          <code>SERPER_API_KEY</code> from your environment and forwards
-          calls upstream. Releases are cosign-signed; the installer
-          verifies the checksum before moving the binary into place.
+          Reads <code>OPENAI_API_KEY</code>,
+          <code>ANTHROPIC_API_KEY</code>,
+          <code>SERPER_API_KEY</code> from your env and forwards calls
+          upstream. Releases are cosign-signed; the installer verifies
+          the checksum before moving the binary into place.
         </p>
 
         <div class="terminal">
@@ -338,14 +328,14 @@
         <dl class="grid-trust">
           <div>
             <dt>Your keys stay local</dt>
-            <dd>Provider API keys never leave your machine. No control
-            plane. <strong>No data retention by architecture.</strong></dd>
+            <dd>API keys never leave your machine. No control plane.
+            <strong>No data retention by architecture.</strong></dd>
           </div>
           <div>
             <dt>BUSL 1.1 → Apache 2.0</dt>
-            <dd>Source-available today; self-hosting and internal
-            commercial use are permitted. Each release converts to Apache
-            2.0 four years after publication.
+            <dd>Source-available today. Self-hosting and internal
+            commercial use are permitted. Each release converts to
+            Apache 2.0 four years after publication.
             <a href="https://github.com/brainsparker/frugal/blob/main/LICENSE-BUSL-FAQ.md" rel="noopener">License FAQ →</a></dd>
           </div>
         </dl>
@@ -358,9 +348,8 @@
           <div>
             <h2 id="cta-banner-heading">Cut the tool bill.</h2>
             <p>
-              One Go binary. Three lines to install. Routes every tool
-              call your agent makes to the cheapest provider that returns
-              a result. BYOK. No account.
+              One Go binary. Three lines to install. Every tool call
+              routed to the cheapest provider that works. BYOK.
             </p>
           </div>
           <div class="cta-banner-actions">
