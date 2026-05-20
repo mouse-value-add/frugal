@@ -13,6 +13,13 @@ search_providers:
     searxng:
         base_url_env: SEARXNG_URL
         cost_per_call: 0.0
+    # Free / public: community-run indie-web search. No API key required;
+    # the driver identifies itself via User-Agent per Marginalia etiquette.
+    # Ties with SearXNG on cost (both 0) — config order decides which is
+    # hit first when both are configured.
+    marginalia:
+        base_url: https://api.marginalia.nu
+        cost_per_call: 0.0
     # Cheap paid fallback.
     serper:
         api_key_env: SERPER_API_KEY

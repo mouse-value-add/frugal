@@ -17,6 +17,7 @@ import (
 	"github.com/frugalsh/frugal/internal/mcp"
 	"github.com/frugalsh/frugal/internal/mcp/tools"
 	"github.com/frugalsh/frugal/internal/obs"
+	"github.com/frugalsh/frugal/internal/provider/marginalia"
 	"github.com/frugalsh/frugal/internal/provider/searxng"
 	"github.com/frugalsh/frugal/internal/provider/serper"
 	"github.com/frugalsh/frugal/internal/provider/youcom"
@@ -343,6 +344,11 @@ func buildSearchers(cfg *config.Config) []search.Searcher {
 			if c := searxng.New(base); c != nil {
 				out = append(out, c)
 			}
+		case "marginalia":
+			// Public, donation-funded; no API key, no required URL —
+			// driver defaults to the public endpoint. Always registers
+			// if the YAML entry exists.
+			out = append(out, marginalia.New(base))
 		default:
 			slog.Warn("mcp serve: unknown search provider in config; ignoring",
 				"name", name, "hint", "add a driver in internal/provider/<name> and a switch case here")
