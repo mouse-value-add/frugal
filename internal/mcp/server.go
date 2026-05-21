@@ -108,6 +108,9 @@ type HTTPOptions struct {
 	// already handles long-poll'ish streaming; cap at the proxy layer for
 	// remote deployments).
 	RequestTimeout time.Duration
+	// MaxRequestBytes rejects requests whose declared Content-Length exceeds
+	// this limit. <=0 disables the guard.
+	MaxRequestBytes int64
 }
 
 // ServeHTTP runs the MCP server over Streamable HTTP on addr. Returns when
@@ -147,6 +150,7 @@ func (s *Server) ServeHTTP(ctx context.Context, addr string, opts HTTPOptions) e
 
 	var handler http.Handler = mux
 	handler = withRequestTimeout(handler, opts.RequestTimeout)
+	handler = withMaxContentLength(handler, opts.MaxRequestBytes)
 	if opts.RateLimitPerMinute > 0 {
 		handler = withRateLimit(handler, opts.RateLimitPerMinute)
 	}
@@ -189,6 +193,19 @@ func (s *Server) ServeHTTP(ctx context.Context, addr string, opts HTTPOptions) e
 		}
 		return nil
 	}
+}
+
+func withMaxContentLength(next http.Handler, maxBytes int64) http.Handler {
+	if maxBytes <= 0 {
+		return next
+	}
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.ContentLength > maxBytes {
+			http.Error(w, "request too large", http.StatusRequestEntityTooLarge)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
 }
 
 // withBearerAuth rejects requests whose Authorization header doesn't carry

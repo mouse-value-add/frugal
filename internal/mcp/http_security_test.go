@@ -1,6 +1,7 @@
 package mcp
 
 import (
+	"bytes"
 	"context"
 	"io"
 	"log/slog"
@@ -191,5 +192,27 @@ func TestServeHTTP_MetricsEndpointBypassesAuth(t *testing.T) {
 	defer resp2.Body.Close()
 	if resp2.StatusCode != http.StatusUnauthorized {
 		t.Errorf("/ status without auth = %d, want 401", resp2.StatusCode)
+	}
+}
+
+func TestWithMaxContentLength_RejectsOversizedRequest(t *testing.T) {
+	h := withMaxContentLength(echoHandler(), 10)
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/", bytes.NewBufferString("01234567890"))
+	req.ContentLength = 11
+	h.ServeHTTP(rec, req)
+	if rec.Code != http.StatusRequestEntityTooLarge {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusRequestEntityTooLarge)
+	}
+}
+
+func TestWithMaxContentLength_AllowsSmallRequest(t *testing.T) {
+	h := withMaxContentLength(echoHandler(), 10)
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/", bytes.NewBufferString("0123456789"))
+	req.ContentLength = 10
+	h.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
 	}
 }
