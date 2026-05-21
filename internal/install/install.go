@@ -1,0 +1,307 @@
+// Package install wires Frugal as an MCP server into the configs of
+// MCP-aware agent clients — Claude Desktop, Cursor, and Claude Code.
+//
+// Two install patterns live here:
+//
+//   - File-based clients (Claude Desktop, Cursor) keep `mcpServers` in a
+//     JSON config file. We idempotently merge `mcpServers.frugal = {command,
+//     args}` into the existing file (or create it), preserving every other
+//     key the user has set.
+//
+//   - CLI-managed clients (Claude Code) own their own config and expect
+//     `claude mcp add` to mutate it. We print the exact command the user
+//     should run rather than attempt to shell out — the `claude` CLI's
+//     flag set varies across versions and we'd rather hand the user a
+//     correct command than guess wrong.
+//
+// `frugal mcp install` consumes this package: it calls DetectClients to
+// see what's present, renders the plan, and (with confirmation) calls
+// Apply on each detected client.
+package install
+
+import (
+	"bytes"
+	"encoding/json"
+	"fmt"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"runtime"
+)
+
+// ServerName is the key Frugal registers under in every client's
+// mcpServers map. Stable across releases — changing it would orphan
+// existing user configs.
+const ServerName = "frugal"
+
+// Kind describes how a client is mutated. File-based clients get a JSON
+// merge; CLI-managed clients get a printed shell command.
+type Kind string
+
+const (
+	KindJSONFile Kind = "json-file"
+	KindCLI      Kind = "cli"
+)
+
+// Client describes one MCP-aware client target.
+type Client struct {
+	// ID is the stable identifier for the --client flag (claude-desktop,
+	// cursor, claude-code).
+	ID string
+	// Title is the human-readable name shown in the install plan.
+	Title string
+	// Kind picks between JSON-file merge and CLI-command print.
+	Kind Kind
+	// ConfigPath is the absolute path of the file that gets merged
+	// (file-based clients only). Empty for CLI-managed clients.
+	ConfigPath string
+	// Detected is true when DetectClients found enough evidence that the
+	// client is installed on this machine.
+	Detected bool
+	// DetectionReason is a short human-readable note explaining the
+	// Detected verdict.
+	DetectionReason string
+}
+
+// ServerEntry is the value Frugal writes under mcpServers.frugal. The
+// shape matches what Claude Desktop and Cursor consume (both use the same
+// schema). Args is omitted from JSON when empty.
+type ServerEntry struct {
+	Command string            `json:"command"`
+	Args    []string          `json:"args,omitempty"`
+	Env     map[string]string `json:"env,omitempty"`
+}
+
+// AllClients returns the static catalog of clients Frugal knows how to
+// install into. Detection state (config-file existence, CLI on PATH) is
+// populated by DetectClients; this function alone is filesystem-pure so
+// tests can assert the catalog without setting up paths.
+func AllClients() []Client {
+	return []Client{
+		{ID: "claude-desktop", Title: "Claude Desktop", Kind: KindJSONFile, ConfigPath: claudeDesktopConfigPath()},
+		{ID: "cursor", Title: "Cursor", Kind: KindJSONFile, ConfigPath: cursorConfigPath()},
+		{ID: "claude-code", Title: "Claude Code", Kind: KindCLI},
+	}
+}
+
+// DetectClients fills Detected + DetectionReason on each client by
+// checking for the relevant config file or binary on PATH. Returns the
+// full catalog — undetected entries are still present so callers can
+// explain "we didn't find X" if the user passes --client X.
+func DetectClients() []Client {
+	clients := AllClients()
+	for i := range clients {
+		c := &clients[i]
+		switch c.ID {
+		case "claude-desktop", "cursor":
+			if c.ConfigPath == "" {
+				c.DetectionReason = "no known config path for this OS"
+				continue
+			}
+			// Detection is "the parent directory exists" — having the
+			// directory means the client has been installed at some point,
+			// even if the file itself hasn't been written yet.
+			dir := filepath.Dir(c.ConfigPath)
+			if _, err := os.Stat(dir); err == nil {
+				c.Detected = true
+				c.DetectionReason = "config dir present at " + dir
+			} else {
+				c.DetectionReason = "config dir not found at " + dir
+			}
+		case "claude-code":
+			if path, err := exec.LookPath("claude"); err == nil {
+				c.Detected = true
+				c.DetectionReason = "claude CLI at " + path
+			} else {
+				c.DetectionReason = "claude CLI not found on PATH"
+			}
+		}
+	}
+	return clients
+}
+
+// PlanFor returns the human-readable change description that Apply would
+// effect for client c, given the path to the frugal binary. Used by
+// `frugal mcp install --print` to preview without writing.
+func PlanFor(c Client, binPath string) string {
+	switch c.Kind {
+	case KindJSONFile:
+		return fmt.Sprintf("merge `mcpServers.%s = {command: %q, args: [mcp serve]}` into %s",
+			ServerName, binPath, c.ConfigPath)
+	case KindCLI:
+		return "print this command for the user to run:\n  " + claudeCodeAddCommand(binPath)
+	}
+	return ""
+}
+
+// Apply writes (or schedules) the install for one client. For JSON-file
+// clients the config is read, merged, and written atomically. For CLI
+// clients the function returns the suggested command string so the
+// caller can print it (Apply never shells out).
+func Apply(c Client, binPath string) (suggestion string, err error) {
+	entry := ServerEntry{Command: binPath, Args: []string{"mcp", "serve"}}
+	switch c.Kind {
+	case KindJSONFile:
+		return "", mergeJSONConfig(c.ConfigPath, ServerName, entry)
+	case KindCLI:
+		return claudeCodeAddCommand(binPath), nil
+	}
+	return "", fmt.Errorf("unknown client kind: %s", c.Kind)
+}
+
+// FrugalBinary resolves the absolute path of the running frugal binary,
+// following symlinks so the embedded config points at the real file
+// (not the homebrew shim or the installer's wrapper). The path is what
+// gets written into Claude Desktop / Cursor configs so the agent process
+// can spawn `frugal mcp serve` later.
+func FrugalBinary() (string, error) {
+	exe, err := os.Executable()
+	if err != nil {
+		return "", fmt.Errorf("locate frugal binary: %w", err)
+	}
+	if resolved, err := filepath.EvalSymlinks(exe); err == nil {
+		exe = resolved
+	}
+	return exe, nil
+}
+
+// claudeDesktopConfigPath returns the OS-specific Claude Desktop config
+// file location.
+func claudeDesktopConfigPath() string {
+	switch runtime.GOOS {
+	case "darwin":
+		home, _ := os.UserHomeDir()
+		return filepath.Join(home, "Library", "Application Support", "Claude", "claude_desktop_config.json")
+	case "windows":
+		appData := os.Getenv("APPDATA")
+		if appData == "" {
+			return ""
+		}
+		return filepath.Join(appData, "Claude", "claude_desktop_config.json")
+	case "linux":
+		home, _ := os.UserHomeDir()
+		return filepath.Join(home, ".config", "Claude", "claude_desktop_config.json")
+	}
+	return ""
+}
+
+// cursorConfigPath returns the global Cursor MCP config path. The project
+// variant (.cursor/mcp.json in cwd) is out of scope for the v1 installer
+// — easy to add later behind a --project flag.
+func cursorConfigPath() string {
+	home, _ := os.UserHomeDir()
+	if home == "" {
+		return ""
+	}
+	return filepath.Join(home, ".cursor", "mcp.json")
+}
+
+// claudeCodeAddCommand renders the `claude mcp add` invocation the user
+// should run to register Frugal with Claude Code. We print this rather
+// than shelling out because the `claude` CLI's flag surface varies
+// across versions and we'd rather hand the user a correct command than
+// fail at exec.
+func claudeCodeAddCommand(binPath string) string {
+	return fmt.Sprintf("claude mcp add %s -- %s mcp serve", ServerName, binPath)
+}
+
+// mergeJSONConfig reads path (creating empty `{}` if missing), sets
+// `mcpServers.<name> = entry`, and writes the result back. Other keys
+// (including unknown mcpServers entries the user added by hand) are
+// preserved verbatim — this is why we round-trip through map[string]any
+// rather than a typed struct.
+func mergeJSONConfig(path, name string, entry ServerEntry) error {
+	if path == "" {
+		return fmt.Errorf("install: empty config path")
+	}
+	root, err := readJSONFile(path)
+	if err != nil {
+		return err
+	}
+	servers, _ := root["mcpServers"].(map[string]any)
+	if servers == nil {
+		servers = map[string]any{}
+	}
+	servers[name] = entryToMap(entry)
+	root["mcpServers"] = servers
+	return writeJSONFile(path, root)
+}
+
+func entryToMap(e ServerEntry) map[string]any {
+	out := map[string]any{"command": e.Command}
+	if len(e.Args) > 0 {
+		// json.Marshal/Unmarshal roundtrip would turn []string into []any
+		// when later read back, so we materialize it as []any up front for
+		// the in-memory value to match the on-disk shape. Users editing
+		// the file by hand will see the same structure either way.
+		args := make([]any, len(e.Args))
+		for i, a := range e.Args {
+			args[i] = a
+		}
+		out["args"] = args
+	}
+	if len(e.Env) > 0 {
+		env := make(map[string]any, len(e.Env))
+		for k, v := range e.Env {
+			env[k] = v
+		}
+		out["env"] = env
+	}
+	return out
+}
+
+// readJSONFile loads path as a generic JSON object. Returns an empty map
+// when the file doesn't exist — that's the "first install" case.
+func readJSONFile(path string) (map[string]any, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return map[string]any{}, nil
+		}
+		return nil, fmt.Errorf("read %s: %w", path, err)
+	}
+	if len(bytes.TrimSpace(data)) == 0 {
+		return map[string]any{}, nil
+	}
+	var root map[string]any
+	if err := json.Unmarshal(data, &root); err != nil {
+		return nil, fmt.Errorf("parse %s: %w", path, err)
+	}
+	if root == nil {
+		root = map[string]any{}
+	}
+	return root, nil
+}
+
+// writeJSONFile writes the map atomically: dump JSON to a temp file in
+// the same directory, fsync, rename over the target. Pretty-prints with
+// two-space indentation to match what Claude Desktop and Cursor produce.
+func writeJSONFile(path string, root map[string]any) error {
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return fmt.Errorf("mkdir %s: %w", filepath.Dir(path), err)
+	}
+	buf, err := json.MarshalIndent(root, "", "  ")
+	if err != nil {
+		return fmt.Errorf("encode: %w", err)
+	}
+	// Append a trailing newline — both Claude Desktop and Cursor write
+	// one and editors expect it.
+	buf = append(buf, '\n')
+	tmp, err := os.CreateTemp(filepath.Dir(path), ".frugal-install-*.json")
+	if err != nil {
+		return fmt.Errorf("create temp: %w", err)
+	}
+	tmpPath := tmp.Name()
+	defer os.Remove(tmpPath) // no-op if rename succeeded
+	if _, err := tmp.Write(buf); err != nil {
+		tmp.Close()
+		return fmt.Errorf("write temp: %w", err)
+	}
+	if err := tmp.Close(); err != nil {
+		return fmt.Errorf("close temp: %w", err)
+	}
+	if err := os.Rename(tmpPath, path); err != nil {
+		return fmt.Errorf("rename temp to %s: %w", path, err)
+	}
+	return nil
+}

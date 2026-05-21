@@ -1,0 +1,186 @@
+// Package tools registers Frugal's routed MCP tools against an
+// *mcp.Server. Each tool here delegates to the relevant internal/provider
+// driver(s) via a small interface defined in internal/search (and, in
+// later PRs, internal/extract, internal/cache, …).
+//
+// The tool surface is intentionally narrow: one tool per capability
+// (frugal__search, frugal__extract, frugal__chat, …) with the provider
+// choice happening inside the handler. Agents see one stable tool name;
+// the routing decision is invisible to them.
+package tools
+
+import (
+	"context"
+	"fmt"
+	"log/slog"
+	"sync"
+	"time"
+
+	sdkmcp "github.com/modelcontextprotocol/go-sdk/mcp"
+
+	"github.com/frugalsh/frugal/internal/obs"
+	"github.com/frugalsh/frugal/internal/search"
+)
+
+// SearchInput is the JSON-schema-generating shape for frugal__search.
+// Field tags drive the schema the MCP client sees — keep names + descriptions
+// stable across releases, since agents pattern-match on them.
+type SearchInput struct {
+	Query      string `json:"query" jsonschema:"the search query"`
+	MaxResults int    `json:"max_results,omitempty" jsonschema:"max results to return (default 5, clamped to 20)"`
+	Freshness  string `json:"freshness,omitempty" jsonschema:"optional time window: day | week | month"`
+	CacheTTLSeconds int `json:"cache_ttl_seconds,omitempty" jsonschema:"optional in-process cache TTL in seconds (0 disables cache, max 86400)"`
+	// Provider pins the search provider for this call ("searxng", "serper",
+	// "youcom", …). When empty or "auto", Frugal picks the cheapest
+	// configured provider. Recipe authors use this to override the default
+	// for use cases where the eval shows a more expensive provider has
+	// materially better recall.
+	Provider string `json:"provider,omitempty" jsonschema:"optional provider override: searxng | serper | youcom | auto"`
+}
+
+// SearchOutput is the structured-content payload returned to the MCP
+// client. The result list is what the agent reads to compose its answer;
+// CostUSD + ProviderUsed + LatencyMS are the observability footer that
+// makes the routing decision auditable in agent traces.
+type SearchOutput struct {
+	Results      []search.Item `json:"results"`
+	CostUSD      float64       `json:"cost_usd"`
+	ProviderUsed string        `json:"provider_used"`
+	LatencyMS    int64         `json:"latency_ms"`
+	CacheHit     bool          `json:"cache_hit,omitempty"`
+}
+
+// RegisterSearch wires frugal__search onto the given MCP server. searchers
+// is the operator-configured list (one entry per configured provider key).
+// A no-op when searchers is empty — the tool is not registered, so
+// tools/list won't advertise something the server can't fulfill. That
+// distinction matters: agents query tools/list at session start and
+// shouldn't see ghost tools that always error.
+//
+// Pass metrics (non-nil) to record per-provider call counts, error counts,
+// latency, and cost as each call lands. Nil metrics disables observability
+// but keeps the routing semantics identical.
+func RegisterSearch(server *sdkmcp.Server, searchers []search.Searcher, metrics *obs.Metrics) {
+	if len(searchers) == 0 {
+		return
+	}
+	if metrics != nil {
+		for _, s := range searchers {
+			metrics.EnsureProvider(s.Name(), "search")
+		}
+	}
+	desc := fmt.Sprintf(
+		"Run a web search routed across %s. Returns a list of {title, url, snippet} hits "+
+			"plus the actual provider used and cost paid. Provider choice defaults to the "+
+			"cheapest configured; recipe authors can pin via the `provider` argument.",
+		joinNames(searchers),
+	)
+	sdkmcp.AddTool(server, &sdkmcp.Tool{
+		Name:        "frugal__search",
+		Title:       "Web search (routed)",
+		Description: desc,
+		Annotations: &sdkmcp.ToolAnnotations{
+			ReadOnlyHint:    true,
+			DestructiveHint: boolPtr(false),
+			IdempotentHint:  false, // search results can shift between calls
+			OpenWorldHint:   boolPtr(true),
+		},
+	}, makeSearchHandler(searchers, metrics))
+}
+
+func makeSearchHandler(searchers []search.Searcher, metrics *obs.Metrics) func(context.Context, *sdkmcp.CallToolRequest, SearchInput) (*sdkmcp.CallToolResult, SearchOutput, error) {
+	type cacheEntry struct {
+		out       SearchOutput
+		expiresAt time.Time
+	}
+	var (
+		mu    sync.Mutex
+		cache = map[string]cacheEntry{}
+	)
+	// Hook closes over metrics so every fallback attempt is recorded —
+	// not just the winner. Nil metrics skips recording, costing a comparison
+	// per call.
+	hook := search.AttemptHook(nil)
+	if metrics != nil {
+		hook = func(provider string, latency time.Duration, costUSD float64, err error) {
+			metrics.RecordCall(provider, latency, costUSD, err)
+		}
+	}
+
+	return func(ctx context.Context, _ *sdkmcp.CallToolRequest, in SearchInput) (*sdkmcp.CallToolResult, SearchOutput, error) {
+		if in.Query == "" {
+			return nil, SearchOutput{}, fmt.Errorf("frugal__search: query is required")
+		}
+		q := search.Query{
+			Text:       in.Query,
+			MaxResults: in.MaxResults,
+			Freshness:  in.Freshness,
+		}
+		ttl := in.CacheTTLSeconds
+		if ttl < 0 {
+			ttl = 0
+		}
+		if ttl > 86400 {
+			ttl = 86400
+		}
+		if ttl > 0 {
+			key := fmt.Sprintf("%s|%d|%s|%s", in.Query, in.MaxResults, in.Freshness, in.Provider)
+			mu.Lock()
+			if ce, ok := cache[key]; ok && time.Now().Before(ce.expiresAt) {
+				out := ce.out
+				out.CacheHit = true
+				mu.Unlock()
+				return nil, out, nil
+			}
+			mu.Unlock()
+		}
+		logger := slog.Default()
+
+		start := time.Now()
+		var (
+			used search.Searcher
+			res  search.Results
+			err  error
+		)
+		if isAuto(in.Provider) {
+			used, res, err = search.CallWithFallback(ctx, searchers, q, logger, hook)
+		} else {
+			used, res, err = search.CallPinned(ctx, searchers, in.Provider, q, logger, hook)
+		}
+		latency := time.Since(start).Milliseconds()
+		if err != nil {
+			return nil, SearchOutput{}, fmt.Errorf("frugal__search: %w", err)
+		}
+
+		out := SearchOutput{
+			Results:      res.Items,
+			CostUSD:      res.CostUSD,
+			ProviderUsed: used.Name(),
+			LatencyMS:    latency,
+		}
+		if ttl > 0 {
+			key := fmt.Sprintf("%s|%d|%s|%s", in.Query, in.MaxResults, in.Freshness, in.Provider)
+			mu.Lock()
+			cache[key] = cacheEntry{out: out, expiresAt: time.Now().Add(time.Duration(ttl) * time.Second)}
+			mu.Unlock()
+		}
+		return nil, out, nil
+	}
+}
+
+// isAuto reports whether the caller wants auto-routing (the default).
+// Empty string or the explicit sentinel "auto" both mean "pick for me."
+func isAuto(requested string) bool { return requested == "" || requested == "auto" }
+
+func joinNames(searchers []search.Searcher) string {
+	if len(searchers) == 0 {
+		return "(none)"
+	}
+	out := searchers[0].Name()
+	for _, s := range searchers[1:] {
+		out += ", " + s.Name()
+	}
+	return out
+}
+
+func boolPtr(b bool) *bool { return &b }

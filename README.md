@@ -1,169 +1,108 @@
 # frugal
 
-**Open-source LLM proxy that routes every request to the cheapest model that won't compromise quality.**
+**Tool calls are the new tokens.**
 
-No account. No code changes. One command.
+For most agentic workloads the tool bill exceeds the model bill. Frugal is
+an MCP server that routes every tool call your agent makes to the cheapest
+provider that returns a result — free / local first, paid only as fallback,
+premium only when you opt in.
 
-```bash
-curl -fsSL https://frugal.sh/install | sh
-```
+Works with any model. One signed Go binary. Your keys. No account.
+Source-available (BUSL 1.1 → Apache 2.0).
 
-```bash
-frugal python my_app.py
-```
-
-That's it. Frugal starts a local proxy, injects `OPENAI_BASE_URL`, runs your command, and shuts down when it exits. Your app doesn't change. Your API keys stay local. Your bill drops 40-70%.
-
----
-
-## How it works
-
-Frugal wraps any command. It spins up a lightweight local proxy, sets `OPENAI_BASE_URL` to point at it, and routes every LLM request to the cheapest model that won't degrade quality.
-
-```
-frugal python app.py
-       │
-       ├─ starts proxy on a free port
-       ├─ injects OPENAI_BASE_URL into your command's environment
-       ├─ classifies each request (complexity, domain, capabilities)
-       ├─ routes to cheapest model that clears the quality bar
-       └─ shuts down proxy when your command exits
-```
-
-A creative brainstorm doesn't need `o3`. A simple extraction doesn't need `claude-opus`. You're paying for capability you don't use on 60-80% of your LLM calls.
-
-### What the classifier detects
-
-| Signal | How |
-|--------|-----|
-| Code | Regex for code blocks, `function`/`def`/`class` keywords |
-| Math | LaTeX patterns, equation keywords |
-| Reasoning depth | System prompt complexity, conversation length |
-| Output format | JSON mode, tool/function calling |
-| Domain | Keyword detection (coding, creative, analysis, math) |
-
-These signals combine into a complexity score. The router picks the cheapest model that exceeds the quality threshold for that score.
+[frugal.sh](https://frugal.sh) · [Strategy](./STRATEGY.md)
 
 ## Install
 
 ```bash
-curl -fsSL https://frugal.sh/install | sh
+curl -fsSL https://frugal.sh/install | bash
+frugal mcp install
 ```
 
-Downloads a single binary (~10MB), detects your API keys, adds `frugal` to your PATH.
+The first command drops the binary in your `$PATH`. The second auto-detects
+Claude Desktop, Cursor, and Claude Code and merges `frugal` into each
+configured MCP server list.
 
-### From source
+## Set your keys
+
+BYOK. Frugal reads provider credentials from your environment:
 
 ```bash
-git clone https://github.com/frugalsh/frugal.git
-cd frugal
-make build
+# Search — frugal__search
+export SEARXNG_URL=...           # free, self-hosted (also Marginalia free, no key)
+export SERPER_API_KEY=...        # cheap paid
+export YDC_API_KEY=...           # premium paid (You.com)
+
+# Extract — frugal__extract (goreadability is free, no key)
+export FIRECRAWL_API_KEY=...     # premium paid (JS-rendered pages)
+
+# Browse — frugal__browse
+export BROWSERLESS_TOKEN=...     # headless render
 ```
 
-## Usage
+That's it. Restart your agent. `frugal__search`, `frugal__extract`, and
+`frugal__browse` show up in the tool picker (only the tools whose
+providers are configured get registered).
 
-### Wrap any command
+## The rack-rate gap
+
+Tool prices haven't fallen the way model prices have. You.com at $0.005/call
+is 5× Serper at $0.001/call. SearXNG, running on your own machine, is free.
+
+| Capability | Free / local | Cheap paid | Premium paid | Status |
+|---|---|---|---|---|
+| Search | **SearXNG** · **Marginalia** | **Serper** $0.001/call | **You.com** $0.005/call | shipping |
+| Extract | **go-readability** (local) | — | **Firecrawl** $0.001/page | shipping |
+| Browse | local Playwright *(deferred)* | **Browserless** $0.002/render | Browserbase | partial |
+| Code exec | local Docker | E2B ~$0.10/hr (2 vCPU) | Modal | planned |
+| Embeddings | nomic-embed-text, bge-large | text-embedding-3-small $0.02/1M tok | 3-large, Voyage-3, Cohere | planned |
+| Transcription | whisper.cpp | Deepgram Nova $0.0043/min | OpenAI Whisper $0.006/min | planned |
+
+Frugal walks the columns left to right. Each tool call goes to the leftmost
+configured provider that returns a result; you keep the gap.
+
+## What ships today
+
+One MCP server, three tools, seven providers:
+
+- **`frugal__search`** — routed across **SearXNG** (free, self-hosted),
+  **Marginalia** (free, public), **Serper** (`$0.001/call`), and
+  **You.com** (`$0.005/call`). Supports optional `cache_ttl_seconds`
+  for lightweight in-process response caching.
+- **`frugal__extract`** — routed across **go-readability** (free, pure-Go
+  local Readability) and **Firecrawl** (`~$0.001/page`, JS-rendered).
+- **`frugal__browse`** — **Browserless** (`~$0.002/render`, headless
+  Chrome). Local Playwright deferred.
+- Stdio + Streamable HTTP transports.
+- HTTP transport supports bearer-token auth (`FRUGAL_AUTH_TOKEN`),
+  per-IP rate limiting, and a `/metrics` endpoint (Prometheus text:
+  `frugal_calls_total{tool=,provider=}` etc.).
+- `frugal mcp install` writes the right config into Claude Desktop,
+  Cursor, and Claude Code.
+
+## What's coming
+
+- **Phase 3** — embeddings, transcription, code execution, local chat
+  models, semantic cache.
+- **Phase 4** — Frugal Cloud: hosted MCP endpoint for users who don't want
+  to operate the local stack themselves.
+
+Roadmap and rationale in [STRATEGY.md](./STRATEGY.md).
+
+## From source
 
 ```bash
-frugal python my_app.py
-frugal node server.js
-frugal go run ./cmd/myservice
-frugal pytest tests/
-frugal bash -c 'curl https://api.openai.com/v1/...'
-```
-
-Frugal picks a free port, starts the proxy, sets `OPENAI_BASE_URL` in your command's environment, and cleans up on exit. Works with any OpenAI-compatible SDK — Python, Node, Go, Rust, curl.
-
-### Run as a server
-
-If you want a persistent proxy (e.g., shared across terminals or in Docker):
-
-```bash
-frugal serve
-# or just: frugal (with no arguments)
-```
-
-Then set the env var yourself:
-
-```bash
-export OPENAI_BASE_URL=http://localhost:8080/v1
-```
-
-### Quality thresholds
-
-Control cost vs. quality per request:
-
-```python
-headers = {"X-Frugal-Quality": "cost"}  # high | balanced | cost
-```
-
-| Threshold | Behavior |
-|-----------|----------|
-| `high` | Top-tier models only. |
-| `balanced` | Default. Best cost-quality tradeoff. |
-| `cost` | Cheapest viable model. Maximum savings. |
-
-### Model pinning
-
-Skip routing for specific calls:
-
-```python
-response = client.chat.completions.create(
-    model="gpt-4o-mini",  # goes straight to this model
-    messages=[...]
-)
-```
-
-### Fallback chains
-
-```python
-headers = {"X-Frugal-Fallback": "gpt-4o,claude-sonnet-4-20250514,gemini-2.5-flash"}
-```
-
-If the routed model errors, Frugal walks the chain.
-
-## Supported models
-
-Pricing synced from [models.dev](https://models.dev) on every startup.
-
-| Provider | Models |
-|----------|--------|
-| OpenAI | GPT-4o, GPT-4o-mini, GPT-4.1, GPT-4.1-mini, GPT-4.1-nano |
-| Anthropic | Claude Opus 4, Claude Sonnet 4, Claude Haiku 3.5 |
-| Google | Gemini 2.5 Pro, Gemini 2.5 Flash, Gemini 2.0 Flash |
-
-Set `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, and/or `GOOGLE_API_KEY`. Frugal registers whichever providers have keys.
-
-Add models by editing `~/.frugal/config/models.yaml`.
-
-## Commands
-
-| Command | What it does |
-|---------|-------------|
-| `frugal <cmd>` | Wrap a command with the routing proxy |
-| `frugal serve` | Run the proxy as a persistent server |
-| `frugal sync` | Update model pricing from models.dev |
-
-## API
-
-When running as a server, Frugal exposes an OpenAI-compatible API:
-
-| Endpoint | Description |
-|----------|-------------|
-| `POST /v1/chat/completions` | Routed chat (streaming + non-streaming) |
-| `GET /v1/models` | List available models |
-| `GET /v1/routing/explain` | Last routing decision |
-| `GET /health` | Health check |
-
-## Development
-
-```bash
-make build    # build binary
-make test     # run tests
-make run      # build + run server
-make release  # cross-compile for all platforms
+git clone https://github.com/brainsparker/frugal.git && cd frugal && make build
 ```
 
 ## License
 
-MIT
+[BUSL 1.1](./LICENSE) — self-hosting and internal commercial use are
+permitted. Each release converts to Apache 2.0 four years after publication.
+Plain-English summary in [LICENSE-BUSL-FAQ.md](./LICENSE-BUSL-FAQ.md).
+
+## Security
+
+Private vulnerability reports via [GitHub Security
+Advisories](https://github.com/brainsparker/frugal/security/advisories/new).
+Full policy in [SECURITY.md](./SECURITY.md).

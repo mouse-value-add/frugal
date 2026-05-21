@@ -1,0 +1,202 @@
+package install
+
+import (
+	"encoding/json"
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+)
+
+func TestMergeJSONConfig_CreatesFileWithEntry(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "subdir", "config.json")
+	entry := ServerEntry{Command: "/usr/local/bin/frugal", Args: []string{"mcp", "serve"}}
+	if err := mergeJSONConfig(path, ServerName, entry); err != nil {
+		t.Fatalf("mergeJSONConfig: %v", err)
+	}
+	root := loadJSON(t, path)
+	servers, ok := root["mcpServers"].(map[string]any)
+	if !ok {
+		t.Fatalf("mcpServers missing or wrong type: %#v", root["mcpServers"])
+	}
+	frugal, ok := servers["frugal"].(map[string]any)
+	if !ok {
+		t.Fatalf("frugal entry missing: %#v", servers)
+	}
+	if got := frugal["command"]; got != "/usr/local/bin/frugal" {
+		t.Errorf("command: got %v", got)
+	}
+	args, ok := frugal["args"].([]any)
+	if !ok || len(args) != 2 || args[0] != "mcp" || args[1] != "serve" {
+		t.Errorf("args: got %#v", frugal["args"])
+	}
+}
+
+func TestMergeJSONConfig_PreservesUnrelatedEntries(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.json")
+	// Seed with an existing user entry that has nothing to do with frugal.
+	existing := map[string]any{
+		"mcpServers": map[string]any{
+			"my-custom-server": map[string]any{
+				"command": "/opt/bin/other",
+				"args":    []any{"--flag"},
+			},
+		},
+		"unrelated_top_level": "should-survive",
+	}
+	writeJSON(t, path, existing)
+
+	if err := mergeJSONConfig(path, ServerName, ServerEntry{Command: "/bin/frugal", Args: []string{"mcp", "serve"}}); err != nil {
+		t.Fatalf("mergeJSONConfig: %v", err)
+	}
+
+	root := loadJSON(t, path)
+	if root["unrelated_top_level"] != "should-survive" {
+		t.Errorf("unrelated top-level key dropped: %#v", root)
+	}
+	servers, _ := root["mcpServers"].(map[string]any)
+	if _, ok := servers["my-custom-server"]; !ok {
+		t.Errorf("custom server entry dropped: %#v", servers)
+	}
+	if _, ok := servers["frugal"]; !ok {
+		t.Errorf("frugal entry not added: %#v", servers)
+	}
+}
+
+func TestMergeJSONConfig_IdempotentOverwrite(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.json")
+	entry1 := ServerEntry{Command: "/old/path/frugal", Args: []string{"mcp", "serve"}}
+	entry2 := ServerEntry{Command: "/new/path/frugal", Args: []string{"mcp", "serve"}}
+
+	if err := mergeJSONConfig(path, ServerName, entry1); err != nil {
+		t.Fatalf("first merge: %v", err)
+	}
+	if err := mergeJSONConfig(path, ServerName, entry2); err != nil {
+		t.Fatalf("second merge: %v", err)
+	}
+
+	root := loadJSON(t, path)
+	servers, _ := root["mcpServers"].(map[string]any)
+	frugal, _ := servers["frugal"].(map[string]any)
+	if got := frugal["command"]; got != "/new/path/frugal" {
+		t.Errorf("expected command to be overwritten with new path, got %v", got)
+	}
+}
+
+func TestPlanFor_JSONClient(t *testing.T) {
+	c := Client{ID: "claude-desktop", Kind: KindJSONFile, ConfigPath: "/tmp/desktop.json"}
+	plan := PlanFor(c, "/usr/local/bin/frugal")
+	if !strings.Contains(plan, "mcpServers.frugal") {
+		t.Errorf("plan should mention mcpServers.frugal: %s", plan)
+	}
+	if !strings.Contains(plan, "/tmp/desktop.json") {
+		t.Errorf("plan should mention config path: %s", plan)
+	}
+	if !strings.Contains(plan, "/usr/local/bin/frugal") {
+		t.Errorf("plan should mention binary path: %s", plan)
+	}
+}
+
+func TestPlanFor_CLIClient_PrintsClaudeCommand(t *testing.T) {
+	c := Client{ID: "claude-code", Kind: KindCLI}
+	plan := PlanFor(c, "/usr/local/bin/frugal")
+	if !strings.Contains(plan, "claude mcp add frugal") {
+		t.Errorf("plan should suggest claude mcp add: %s", plan)
+	}
+	if !strings.Contains(plan, "/usr/local/bin/frugal mcp serve") {
+		t.Errorf("plan should include frugal binary + args: %s", plan)
+	}
+}
+
+func TestApply_JSONFile(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.json")
+	c := Client{ID: "claude-desktop", Kind: KindJSONFile, ConfigPath: path}
+	if _, err := Apply(c, "/bin/frugal"); err != nil {
+		t.Fatalf("Apply: %v", err)
+	}
+	root := loadJSON(t, path)
+	servers, _ := root["mcpServers"].(map[string]any)
+	if _, ok := servers["frugal"]; !ok {
+		t.Errorf("frugal entry missing after Apply: %#v", servers)
+	}
+}
+
+func TestApply_CLIClient_ReturnsSuggestion(t *testing.T) {
+	c := Client{ID: "claude-code", Kind: KindCLI}
+	suggestion, err := Apply(c, "/bin/frugal")
+	if err != nil {
+		t.Fatalf("Apply: %v", err)
+	}
+	if !strings.Contains(suggestion, "claude mcp add frugal") {
+		t.Errorf("CLI suggestion missing: %s", suggestion)
+	}
+}
+
+func TestDetectClients_HitsForTempConfigDir(t *testing.T) {
+	// Point HOME at a tempdir where we'll create a fake Claude Desktop
+	// directory; detection should flip claude-desktop to Detected=true.
+	tmpHome := t.TempDir()
+	t.Setenv("HOME", tmpHome)
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(tmpHome, ".config")) // some platforms read this
+	// Create the OS-specific parent directory expected by detection.
+	desktopPath := claudeDesktopConfigPath()
+	if desktopPath == "" {
+		t.Skip("no claude desktop path for this OS")
+	}
+	if err := os.MkdirAll(filepath.Dir(desktopPath), 0o755); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+	clients := DetectClients()
+	for _, c := range clients {
+		if c.ID == "claude-desktop" {
+			if !c.Detected {
+				t.Errorf("expected claude-desktop detected, got false (reason=%s)", c.DetectionReason)
+			}
+			return
+		}
+	}
+	t.Fatalf("claude-desktop not in client list")
+}
+
+func TestAllClients_CatalogStable(t *testing.T) {
+	got := AllClients()
+	wantIDs := []string{"claude-desktop", "cursor", "claude-code"}
+	if len(got) != len(wantIDs) {
+		t.Fatalf("AllClients: got %d entries, want %d", len(got), len(wantIDs))
+	}
+	for i, want := range wantIDs {
+		if got[i].ID != want {
+			t.Errorf("AllClients[%d].ID = %q, want %q", i, got[i].ID, want)
+		}
+	}
+}
+
+// --- helpers ---
+
+func loadJSON(t *testing.T, path string) map[string]any {
+	t.Helper()
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read %s: %v", path, err)
+	}
+	var out map[string]any
+	if err := json.Unmarshal(data, &out); err != nil {
+		t.Fatalf("parse %s: %v", path, err)
+	}
+	return out
+}
+
+func writeJSON(t *testing.T, path string, root map[string]any) {
+	t.Helper()
+	data, err := json.Marshal(root)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	if err := os.WriteFile(path, data, 0o644); err != nil {
+		t.Fatalf("write %s: %v", path, err)
+	}
+}

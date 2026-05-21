@@ -1,150 +1,67 @@
-providers:
-    anthropic:
-        api_key_env: ANTHROPIC_API_KEY
-        base_url: https://api.anthropic.com
-        models:
-            claude-haiku-3.5:
-                cost_per_1k_input: 0.00068
-                cost_per_1k_output: 0.0034
-                capabilities:
-                    reasoning: 0.72
-                    coding: 0.7
-                    creative: 0.68
-                    instruction_following: 0.78
-                    tool_use: true
-                    json_mode: false
-                    max_context: 189096
-            claude-opus-4-20250918:
-                cost_per_1k_input: 0.005
-                cost_per_1k_output: 0.025
-                capabilities:
-                    reasoning: 0.98
-                    coding: 0.97
-                    creative: 0.95
-                    instruction_following: 0.97
-                    tool_use: true
-                    json_mode: false
-                    max_context: 200000
-            claude-sonnet-4-20250514:
-                cost_per_1k_input: 0.003
-                cost_per_1k_output: 0.015
-                capabilities:
-                    reasoning: 0.93
-                    coding: 0.95
-                    creative: 0.88
-                    instruction_following: 0.94
-                    tool_use: true
-                    json_mode: false
-                    max_context: 200000
-    google:
-        api_key_env: GOOGLE_API_KEY
-        base_url: https://generativelanguage.googleapis.com
-        models:
-            gemini-2.0-flash:
-                cost_per_1k_input: 0.0001
-                cost_per_1k_output: 0.0004
-                capabilities:
-                    reasoning: 0.7
-                    coding: 0.68
-                    creative: 0.65
-                    instruction_following: 0.72
-                    tool_use: true
-                    json_mode: true
-                    max_context: 1048576
-            gemini-2.5-flash:
-                cost_per_1k_input: 0.0003
-                cost_per_1k_output: 0.0025
-                capabilities:
-                    reasoning: 0.72
-                    coding: 0.7
-                    creative: 0.66
-                    instruction_following: 0.74
-                    tool_use: true
-                    json_mode: true
-                    max_context: 1048576
-            gemini-2.5-pro:
-                cost_per_1k_input: 0.00125
-                cost_per_1k_output: 0.01
-                capabilities:
-                    reasoning: 0.9
-                    coding: 0.88
-                    creative: 0.82
-                    instruction_following: 0.88
-                    tool_use: true
-                    json_mode: true
-                    max_context: 1048576
-    openai:
-        api_key_env: OPENAI_API_KEY
-        base_url: https://api.openai.com/v1
-        models:
-            gpt-4o:
-                cost_per_1k_input: 0.0025
-                cost_per_1k_output: 0.01
-                capabilities:
-                    reasoning: 0.95
-                    coding: 0.92
-                    creative: 0.9
-                    instruction_following: 0.95
-                    tool_use: true
-                    json_mode: true
-                    max_context: 128000
-            gpt-4o-mini:
-                cost_per_1k_input: 0.00015
-                cost_per_1k_output: 0.0006
-                capabilities:
-                    reasoning: 0.75
-                    coding: 0.72
-                    creative: 0.7
-                    instruction_following: 0.8
-                    tool_use: true
-                    json_mode: true
-                    max_context: 128000
-            gpt-4.1:
-                cost_per_1k_input: 0.002
-                cost_per_1k_output: 0.008
-                capabilities:
-                    reasoning: 0.96
-                    coding: 0.94
-                    creative: 0.88
-                    instruction_following: 0.96
-                    tool_use: true
-                    json_mode: true
-                    max_context: 1047576
-            gpt-4.1-mini:
-                cost_per_1k_input: 0.0004
-                cost_per_1k_output: 0.0016
-                capabilities:
-                    reasoning: 0.8
-                    coding: 0.78
-                    creative: 0.74
-                    instruction_following: 0.82
-                    tool_use: true
-                    json_mode: true
-                    max_context: 1047576
-            gpt-4.1-nano:
-                cost_per_1k_input: 0.0001
-                cost_per_1k_output: 0.0004
-                capabilities:
-                    reasoning: 0.62
-                    coding: 0.58
-                    creative: 0.55
-                    instruction_following: 0.65
-                    tool_use: true
-                    json_mode: true
-                    max_context: 1047576
-quality_thresholds:
-    balanced:
-        min_reasoning: 0.7
-        min_coding: 0.68
-        min_creative: 0.65
-        min_instruction_following: 0.72
-    cost:
-        min_reasoning: 0
-        min_coding: 0
-        min_creative: 0
-        min_instruction_following: 0
-    high:
-        min_reasoning: 0.88
-        min_coding: 0.85
-        min_creative: 0.82
-        min_instruction_following: 0.88
+# Routed search providers consumed by the frugal__search MCP tool.
+# Each entry whose api_key_env is set in the operator's environment is
+# registered at startup; the cheapest cost_per_call is the default route
+# when the tool is called without an explicit `provider` argument.
+#
+# v1.0 ships only the search-tool layer. Chat-model routing and its
+# pricing tables come back in Phase 2 with the frugal__chat MCP tool.
+search_providers:
+    # Free / local-first: a self-hosted SearXNG instance. CostPerCall is 0
+    # so it sorts ahead of paid providers in the auto-router; the fallback
+    # chain catches us automatically if the instance is down. Operators
+    # set SEARXNG_URL to enable (https://docs.searxng.org/admin/installation.html).
+    searxng:
+        base_url_env: SEARXNG_URL
+        cost_per_call: 0.0
+    # Free / public: community-run indie-web search. No API key required;
+    # the driver identifies itself via User-Agent per Marginalia etiquette.
+    # Ties with SearXNG on cost (both 0) — config order decides which is
+    # hit first when both are configured.
+    marginalia:
+        base_url: https://api.marginalia.nu
+        cost_per_call: 0.0
+    # Cheap paid fallback.
+    serper:
+        api_key_env: SERPER_API_KEY
+        base_url: https://google.serper.dev
+        cost_per_call: 0.001
+    # Premium paid fallback — LLM-tuned snippets. List price is $0.005
+    # per call; new accounts get $100 in onboarding credit (~20,000
+    # calls before any charge). NOTE: You.com also offers an MCP
+    # server at api.you.com/mcp with a no-key free tier (100 queries/
+    # day at ?profile=free) — we don't proxy through it from this
+    # REST driver, but agents can hit it directly.
+    youcom:
+        api_key_env: YDC_API_KEY
+        base_url: https://ydc-index.io
+        cost_per_call: 0.005
+
+# Extract providers consumed by the frugal__extract MCP tool. Same
+# routing rules as search: cheapest configured wins; transient errors
+# fall through; permanent (e.g. empty content → likely JS-rendered)
+# stop the chain and surface to the agent.
+extract_providers:
+    # Free / local: pure-Go Readability port. Fetches the URL with the
+    # operator's HTTP client and runs an in-process content-extraction
+    # pass. Returns Permanent on empty content (JS-rendered pages),
+    # which lets the router fall through to a paid driver.
+    goreadability:
+        cost_per_call: 0.0
+    # Premium paid: handles JS-rendered pages, anti-bot defenses, and
+    # PDF / binary content. Operators set FIRECRAWL_API_KEY to enable.
+    firecrawl:
+        api_key_env: FIRECRAWL_API_KEY
+        base_url: https://api.firecrawl.dev
+        cost_per_call: 0.001
+
+# Browse providers consumed by the frugal__browse MCP tool. Use this
+# tool when the page needs JS execution to populate content (when
+# frugal__extract returns empty / "page likely requires JS").
+browse_providers:
+    # Hosted headless Chrome. Handles JS, anti-bot waits, custom wait-
+    # for selectors. Operators set BROWSERLESS_TOKEN to enable. Local
+    # Playwright is deferred (binary install friction).
+    browserless:
+        api_key_env: BROWSERLESS_TOKEN
+        base_url: https://chrome.browserless.io
+        cost_per_call: 0.002

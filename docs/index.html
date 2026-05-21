@@ -1,0 +1,423 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>frugal — tool calls are the new tokens</title>
+  <meta name="description" content="The tool bill exceeds the model bill. Frugal routes every agent tool call — search, extract, browse, code-exec, embeddings — to the cheapest provider that returns a result. Free / local first. Paid as fallback. BYOK." />
+  <meta name="theme-color" content="#fafafa" />
+  <meta name="color-scheme" content="light" />
+
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content="https://frugal.sh/" />
+  <meta property="og:title" content="frugal — tool calls are the new tokens" />
+  <meta property="og:description" content="The tool bill exceeds the model bill. Frugal routes every tool call to the cheapest provider that returns a result. SearXNG / Trafilatura / Playwright free. Serper cheap. You.com / Firecrawl / Browserbase as fallback. Any model. BYOK." />
+  <meta property="og:site_name" content="frugal.sh" />
+
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="frugal — tool calls are the new tokens" />
+  <meta name="twitter:description" content="The MCP server that routes every tool call to the cheapest provider. $0-first. Any model. BYOK." />
+
+  <link rel="canonical" href="https://frugal.sh/" />
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="/styles.css" />
+
+  <!-- Google tag (gtag.js) -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-N106Q6VFLM"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', 'G-N106Q6VFLM');
+  </script>
+</head>
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+
+  <header class="top">
+    <div class="top-inner">
+      <a class="brand" href="/" aria-label="frugal home">
+        <span class="brand-mark" aria-hidden="true">🎺</span>
+        <span class="brand-name">frugal</span>
+      </a>
+      <nav class="top-nav" aria-label="Primary">
+        <a href="#rack-rates">Rack rates</a>
+        <a href="#surfaces">MCP</a>
+        <a href="#install">Install</a>
+        <a class="nav-cta" href="https://github.com/brainsparker/frugal" rel="noopener">GitHub →</a>
+      </nav>
+    </div>
+  </header>
+
+  <main id="main">
+    <section class="hero">
+      <div class="hero-bg" aria-hidden="true">
+        <div class="orb emerald"></div>
+        <div class="orb cyan"></div>
+        <div class="orb violet"></div>
+        <span class="hero-trumpet">🎺</span>
+      </div>
+
+      <div class="shell">
+        <div class="hero-grid">
+          <div class="hero-content reveal">
+            <p class="eyebrow">source-available · byok · any model</p>
+
+            <h1>
+              Tool calls are the
+              <span class="accent">new tokens.</span>
+            </h1>
+            <p class="lede">
+              Routes every tool call to the cheapest provider that
+              returns a result. <strong>Free / local first.</strong>
+              Paid as fallback. Your keys. No account.
+            </p>
+
+            <div class="pills" role="list">
+              <span role="listitem">$0-first</span>
+              <span role="listitem">BYOK</span>
+              <span role="listitem">Any model</span>
+            </div>
+
+            <div class="cta">
+              <a class="btn btn-primary" href="#install">Install →</a>
+              <a class="btn btn-ghost" href="#rack-rates">See the rate gap</a>
+            </div>
+          </div>
+
+          <aside class="hero-aside reveal" aria-label="Demo">
+            <div class="terminal" aria-label="Wire Frugal into your agent">
+              <div class="terminal-label"><span>wire it into your agent</span><span class="terminal-label-tag">mcp</span></div>
+              <pre class="terminal-body"><code><span class="prompt">$</span> frugal mcp install
+<span class="muted">✓ wired into Claude Desktop, Cursor, Claude Code.</span>
+
+<span class="muted"># &gt; current iPhone prices?
+#   frugal__search → serper · $0.0003
+#   gpt-4.1-nano synthesizes
+# done. total: $0.0008</span></code></pre>
+              <button class="copy" type="button" data-copy="frugal mcp install" aria-label="Copy install example">Copy</button>
+            </div>
+          </aside>
+        </div>
+      </div>
+    </section>
+
+    <section class="social-proof" aria-label="Compatible agents">
+      <div class="shell social-proof-inner">
+        <p class="social-proof-label">Drops into</p>
+        <div class="client-row">
+          <span class="client"><span class="client-mark cd">CD</span> Claude Desktop</span>
+          <span class="client"><span class="client-mark cu">⟢</span> Cursor</span>
+          <span class="client"><span class="client-mark cc">CC</span> Claude Code</span>
+          <span class="client"><span class="client-mark mcp">M</span> Any MCP host</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="capabilities" id="capabilities" aria-labelledby="capabilities-heading">
+      <div class="shell reveal">
+        <p class="section-label">Capabilities</p>
+        <h2 id="capabilities-heading">Every tool call, routed.</h2>
+        <p class="prose">
+          Eight capabilities. Three tiers each. Walked left to right —
+          free first, paid as fallback.
+        </p>
+        <div class="cap-grid">
+          <article class="cap-tile t-emerald" data-status="shipping">
+            <p class="cap-name">Search <span class="cap-status">shipping</span></p>
+            <h3 class="cap-head">Web SERP, routed.</h3>
+            <div class="cap-row"><span class="lbl">Free</span><span class="val free">SearXNG · Marginalia</span></div>
+            <div class="cap-row"><span class="lbl">Cheap</span><span class="val">Serper · $0.001</span></div>
+            <div class="cap-row"><span class="lbl">Premium</span><span class="val paid">You.com · $0.005</span></div>
+          </article>
+          <article class="cap-tile t-cyan" data-status="shipping">
+            <p class="cap-name">Extract <span class="cap-status">shipping</span></p>
+            <h3 class="cap-head">Page → clean text.</h3>
+            <div class="cap-row"><span class="lbl">Free</span><span class="val free">go-readability · local</span></div>
+            <div class="cap-row"><span class="lbl">Cheap</span><span class="val">—</span></div>
+            <div class="cap-row"><span class="lbl">Premium</span><span class="val paid">Firecrawl · $0.001/pg</span></div>
+          </article>
+          <article class="cap-tile t-violet" data-status="partial">
+            <p class="cap-name">Browse <span class="cap-status">partial</span></p>
+            <h3 class="cap-head">Headless rendering.</h3>
+            <div class="cap-row"><span class="lbl">Free</span><span class="val">Playwright (planned)</span></div>
+            <div class="cap-row"><span class="lbl">Cheap</span><span class="val paid">Browserless · $0.002</span></div>
+            <div class="cap-row"><span class="lbl">Premium</span><span class="val">Browserbase (planned)</span></div>
+          </article>
+          <article class="cap-tile t-amber" data-status="planned">
+            <p class="cap-name">Code exec <span class="cap-status">planned</span></p>
+            <h3 class="cap-head">Run untrusted code.</h3>
+            <div class="cap-row"><span class="lbl">Free</span><span class="val free">Docker · local</span></div>
+            <div class="cap-row"><span class="lbl">Cheap</span><span class="val">E2B · $0.10/hr</span></div>
+            <div class="cap-row"><span class="lbl">Premium</span><span class="val paid">Modal · $0.14/hr</span></div>
+          </article>
+          <article class="cap-tile t-emerald" data-status="planned">
+            <p class="cap-name">Embeddings <span class="cap-status">planned</span></p>
+            <h3 class="cap-head">Vector encode.</h3>
+            <div class="cap-row"><span class="lbl">Free</span><span class="val free">nomic, bge · local</span></div>
+            <div class="cap-row"><span class="lbl">Cheap</span><span class="val">3-small · $0.02/1M</span></div>
+            <div class="cap-row"><span class="lbl">Premium</span><span class="val paid">Voyage-3 · Cohere</span></div>
+          </article>
+          <article class="cap-tile t-cyan" data-status="planned">
+            <p class="cap-name">Transcribe <span class="cap-status">planned</span></p>
+            <h3 class="cap-head">Audio → text.</h3>
+            <div class="cap-row"><span class="lbl">Free</span><span class="val free">whisper.cpp · local</span></div>
+            <div class="cap-row"><span class="lbl">Cheap</span><span class="val">Deepgram · $0.0043/min</span></div>
+            <div class="cap-row"><span class="lbl">Premium</span><span class="val paid">Whisper · $0.006/min</span></div>
+          </article>
+          <article class="cap-tile t-violet" data-status="planned">
+            <p class="cap-name">Chat (small) <span class="cap-status">planned</span></p>
+            <h3 class="cap-head">Fast model call.</h3>
+            <div class="cap-row"><span class="lbl">Free</span><span class="val free">Ollama · LM Studio</span></div>
+            <div class="cap-row"><span class="lbl">Cheap</span><span class="val">4o-mini · haiku · flash</span></div>
+            <div class="cap-row"><span class="lbl">Premium</span><span class="val paid">4o · sonnet</span></div>
+          </article>
+          <article class="cap-tile t-amber" data-status="planned">
+            <p class="cap-name">Chat (large) <span class="cap-status">planned</span></p>
+            <h3 class="cap-head">Reasoning model.</h3>
+            <div class="cap-row"><span class="lbl">Free</span><span class="val free">Kimi K2 · Qwen 72B</span></div>
+            <div class="cap-row"><span class="lbl">Cheap</span><span class="val">—</span></div>
+            <div class="cap-row"><span class="lbl">Premium</span><span class="val paid">4o · opus · pro</span></div>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="rack-rates" id="rack-rates" aria-labelledby="rack-rates-heading">
+      <div class="shell reveal">
+        <p class="section-label">The rack-rate gap</p>
+        <h2 id="rack-rates-heading">The cheapest tools for AI.</h2>
+        <p class="prose">
+          Tool prices haven't fallen the way model prices have. You.com
+          is 5× Serper. A Firecrawl scrape costs as much as the
+          gpt-4o-mini call that consumes it. SearXNG, on your machine,
+          is free. <strong>Frugal takes the cheapest result.</strong>
+        </p>
+        <div class="rack-table-wrap">
+          <table class="rack-table">
+            <thead>
+              <tr>
+                <th scope="col">Capability</th>
+                <th scope="col"><span class="status-tag tag-shipping">free / local</span></th>
+                <th scope="col"><span class="status-tag tag-partial">cheap paid</span></th>
+                <th scope="col"><span class="status-tag tag-planned">premium paid</span></th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th scope="row">Search</th>
+                <td data-label="free / local"><strong>SearXNG</strong> (self-host)</td>
+                <td data-label="cheap paid"><strong>Serper</strong> · $0.001/call</td>
+                <td data-label="premium paid"><strong>You.com</strong> · $0.005/call</td>
+              </tr>
+              <tr>
+                <th scope="row">Extract</th>
+                <td data-label="free / local"><strong>Trafilatura</strong>, <strong>readability.js</strong>, <strong>Mercury</strong> (self-host)</td>
+                <td data-label="cheap paid">—</td>
+                <td data-label="premium paid">Firecrawl $0.001–0.005/page</td>
+              </tr>
+              <tr>
+                <th scope="row">Browse</th>
+                <td data-label="free / local"><strong>Playwright</strong> + Chromium (local)</td>
+                <td data-label="cheap paid">Browserless ~$0.002/unit (30s)</td>
+                <td data-label="premium paid">Browserbase $0.10/hr (~$0.002/min)</td>
+              </tr>
+              <tr>
+                <th scope="row">Code exec</th>
+                <td data-label="free / local"><strong>local Docker</strong></td>
+                <td data-label="cheap paid">E2B ~$0.10/hr (2 vCPU)</td>
+                <td data-label="premium paid">Modal ~$0.14/hr (+GPU)</td>
+              </tr>
+              <tr>
+                <th scope="row">Embeddings</th>
+                <td data-label="free / local"><strong>nomic-embed-text</strong>, <strong>bge-large</strong> (local)</td>
+                <td data-label="cheap paid">text-embedding-3-small · $0.02/1M tok</td>
+                <td data-label="premium paid">3-large, Voyage-3, Cohere</td>
+              </tr>
+              <tr>
+                <th scope="row">Transcription</th>
+                <td data-label="free / local"><strong>whisper.cpp</strong> (local)</td>
+                <td data-label="cheap paid">Deepgram Nova · $0.0043/min</td>
+                <td data-label="premium paid">OpenAI Whisper $0.006/min, Speechmatics</td>
+              </tr>
+              <tr>
+                <th scope="row">Chat (small)</th>
+                <td data-label="free / local"><strong>Ollama / LM Studio</strong> (local OSS)</td>
+                <td data-label="cheap paid">gpt-4o-mini, haiku, gemini-flash</td>
+                <td data-label="premium paid">gpt-4o, claude-sonnet</td>
+              </tr>
+              <tr>
+                <th scope="row">Chat (large)</th>
+                <td data-label="free / local"><strong>Kimi K2</strong>, <strong>Qwen 72B</strong> (serious local HW)</td>
+                <td data-label="cheap paid">—</td>
+                <td data-label="premium paid">gpt-4o, claude-opus, gemini-pro</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="prose rack-foot">
+          Every call prints the decision — capability, provider, cost —
+          in the agent's trace.
+        </p>
+      </div>
+    </section>
+
+    <section class="surfaces" id="surfaces" aria-labelledby="surfaces-heading">
+      <div class="shell reveal">
+        <p class="section-label">The product</p>
+        <h2 id="surfaces-heading">One MCP server. That's it.</h2>
+        <p class="prose">
+          Agents talk to Frugal via
+          <a href="https://modelcontextprotocol.io" rel="noopener">MCP</a>.
+          Two commands. No other surface.
+        </p>
+        <div class="code-grid">
+          <figure>
+            <figcaption>install into every detected agent</figcaption>
+<pre><code><span class="prompt">$</span> frugal mcp install
+<span class="muted">detected: Claude Desktop, Cursor, Claude Code
+✓ wrote all three configs.</span></code></pre>
+          </figure>
+          <figure>
+            <figcaption>run as an MCP server</figcaption>
+<pre><code><span class="prompt">$</span> frugal mcp serve
+<span class="muted">mcp ready on stdio. tools: frugal__search</span></code></pre>
+          </figure>
+        </div>
+      </div>
+    </section>
+
+    <section class="install-block" id="install" aria-labelledby="install-heading">
+      <div class="shell reveal">
+        <p class="section-label">Get started</p>
+        <h2 id="install-heading">Install</h2>
+        <p class="prose">
+          One Go binary, ~10 MB. <strong>No SaaS. No account.</strong>
+          Reads <code>OPENAI_API_KEY</code>,
+          <code>ANTHROPIC_API_KEY</code>,
+          <code>SERPER_API_KEY</code> from your env and forwards calls
+          upstream. Releases are cosign-signed; the installer verifies
+          the checksum before moving the binary into place.
+        </p>
+
+        <div class="terminal">
+          <pre class="terminal-body"><code><span class="prompt">$</span> curl -fsSL https://frugal.sh/install | bash</code></pre>
+          <button class="copy" type="button" data-copy="curl -fsSL https://frugal.sh/install | bash" aria-label="Copy install command">Copy</button>
+        </div>
+
+        <h3>From source</h3>
+        <div class="terminal compact">
+          <pre class="terminal-body"><code><span class="prompt">$</span> git clone https://github.com/brainsparker/frugal.git &amp;&amp; cd frugal &amp;&amp; make build</code></pre>
+        </div>
+
+        <h3>Add Frugal to your agent</h3>
+        <div class="terminal compact">
+          <pre class="terminal-body"><code><span class="prompt">$</span> frugal mcp install
+<span class="muted"># auto-detects Claude Desktop, Cursor, Claude Code.
+# merges 'frugal' into each detected config. idempotent.</span></code></pre>
+        </div>
+      </div>
+    </section>
+
+    <section class="trust" aria-labelledby="trust-heading">
+      <div class="shell reveal">
+        <p class="section-label">Trust</p>
+        <h2 id="trust-heading">Built to self-host.</h2>
+        <dl class="grid-trust">
+          <div>
+            <dt>Your keys stay local</dt>
+            <dd>API keys never leave your machine. No control plane.
+            <strong>No data retention by architecture.</strong></dd>
+          </div>
+          <div>
+            <dt>BUSL 1.1 → Apache 2.0</dt>
+            <dd>Source-available today. Self-hosting and internal
+            commercial use are permitted. Each release converts to
+            Apache 2.0 four years after publication.
+            <a href="https://github.com/brainsparker/frugal/blob/main/LICENSE-BUSL-FAQ.md" rel="noopener">License FAQ →</a></dd>
+          </div>
+        </dl>
+      </div>
+    </section>
+
+    <section class="cta-banner" aria-labelledby="cta-banner-heading">
+      <div class="shell reveal">
+        <div class="cta-banner-card">
+          <div>
+            <h2 id="cta-banner-heading">Cut the tool bill.</h2>
+            <p>
+              One Go binary. Three lines to install. Every tool call
+              routed to the cheapest provider that works. BYOK.
+            </p>
+          </div>
+          <div class="cta-banner-actions">
+            <a class="btn btn-primary" href="#install">Install →</a>
+            <a class="btn btn-ghost" href="https://github.com/brainsparker/frugal" rel="noopener">View on GitHub</a>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="bottom">
+    <div class="bottom-inner">
+      <div>
+        <span class="brand-mark small" aria-hidden="true">🎺</span>
+        <span>frugal.sh</span>
+        <span class="bottom-sep" aria-hidden="true">·</span>
+        <span>Created by <a href="https://sparker.co" rel="noopener">sparker.co</a></span>
+      </div>
+      <nav aria-label="Footer">
+        <a href="https://github.com/brainsparker/frugal" rel="noopener">GitHub</a>
+        <a href="https://github.com/brainsparker/frugal#readme" rel="noopener">Docs</a>
+        <a href="https://github.com/brainsparker/frugal/blob/main/SECURITY.md" rel="noopener">Security</a>
+        <a href="https://github.com/brainsparker/frugal/blob/main/LICENSE-BUSL-FAQ.md" rel="noopener">License</a>
+      </nav>
+    </div>
+  </footer>
+
+  <script>
+    // Copy-to-clipboard for every button[data-copy]. Uses the async
+    // clipboard API and falls back to execCommand for pre-clipboard-API
+    // browsers.
+    document.querySelectorAll('button.copy[data-copy]').forEach(function (btn) {
+      btn.addEventListener('click', async function () {
+        var text = btn.dataset.copy;
+        try {
+          await navigator.clipboard.writeText(text);
+        } catch (_) {
+          var ta = document.createElement('textarea');
+          ta.value = text; document.body.appendChild(ta); ta.select();
+          try { document.execCommand('copy'); } catch (_) {}
+          document.body.removeChild(ta);
+        }
+        var orig = btn.textContent;
+        btn.textContent = 'Copied';
+        btn.classList.add('copied');
+        setTimeout(function () {
+          btn.textContent = orig;
+          btn.classList.remove('copied');
+        }, 1400);
+      });
+    });
+
+    // Section reveal on scroll — adds .in-view to each .reveal block as
+    // it enters the viewport. No-op when prefers-reduced-motion is set
+    // (the CSS already neutralizes the transform; the class still
+    // applies so opacity stays at 1).
+    var io = ('IntersectionObserver' in window) && new IntersectionObserver(function (entries) {
+      entries.forEach(function (e) {
+        if (e.isIntersecting) { e.target.classList.add('in-view'); io.unobserve(e.target); }
+      });
+    }, { rootMargin: '0px 0px -10% 0px', threshold: 0.05 });
+    if (io) {
+      document.querySelectorAll('.reveal').forEach(function (el) { io.observe(el); });
+    } else {
+      // Fallback for ancient browsers.
+      document.querySelectorAll('.reveal').forEach(function (el) { el.classList.add('in-view'); });
+    }
+  </script>
+</body>
+</html>
