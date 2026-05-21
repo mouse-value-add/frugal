@@ -1,6 +1,7 @@
 package mcp
 
 import (
+	"bytes"
 	"context"
 	"io"
 	"log/slog"
@@ -278,5 +279,27 @@ func TestWithSecurityHeaders_SetsNoSniffAndNoStore(t *testing.T) {
 	}
 	if got := rec.Header().Get("Cache-Control"); got != "no-store" {
 		t.Fatalf("Cache-Control = %q, want no-store", got)
+	}
+}
+
+func TestWithMaxContentLength_RejectsOversizedRequest(t *testing.T) {
+	h := withMaxContentLength(echoHandler(), 10)
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/", bytes.NewBufferString("01234567890"))
+	req.ContentLength = 11
+	h.ServeHTTP(rec, req)
+	if rec.Code != http.StatusRequestEntityTooLarge {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusRequestEntityTooLarge)
+	}
+}
+
+func TestWithMaxContentLength_AllowsSmallRequest(t *testing.T) {
+	h := withMaxContentLength(echoHandler(), 10)
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/", bytes.NewBufferString("0123456789"))
+	req.ContentLength = 10
+	h.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
 	}
 }
