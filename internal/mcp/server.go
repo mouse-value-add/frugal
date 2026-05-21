@@ -284,12 +284,15 @@ func (r *rateLimited) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	}
 	b := bAny.(*rlBucket)
 	b.mu.Lock()
-	if now.After(b.resetAt) {
+	if !now.Before(b.resetAt) {
 		b.remaining = r.rpm
 		b.resetAt = now.Add(time.Minute)
 	}
 	if b.remaining <= 0 {
 		retry := int(time.Until(b.resetAt).Seconds()) + 1
+		if retry < 1 {
+			retry = 1
+		}
 		b.mu.Unlock()
 		w.Header().Set("Retry-After", fmt.Sprintf("%d", retry))
 		http.Error(w, "rate limited", http.StatusTooManyRequests)

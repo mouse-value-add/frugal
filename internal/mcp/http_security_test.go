@@ -104,6 +104,22 @@ func TestWithRateLimit_PerIPIsolation(t *testing.T) {
 	}
 }
 
+func TestWithRateLimit_ResetsAtBoundaryInstant(t *testing.T) {
+	r := &rateLimited{next: echoHandler(), rpm: 1}
+	ip := "192.0.2.77"
+	now := time.Now()
+	r.buckets.Store(ip, &rlBucket{remaining: 0, resetAt: now})
+	atomic.StoreInt64(&r.bucketCount, 1)
+
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.RemoteAddr = ip + ":1234"
+	r.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200", rec.Code)
+	}
+}
+
 func TestServeHTTP_RefusesAnonymousWithoutFlag(t *testing.T) {
 	srv := New("frugal", "v", slog.New(slog.NewTextHandler(io.Discard, nil)))
 	err := srv.ServeHTTP(context.Background(), ":0", HTTPOptions{}) // no token, no allow-anon
