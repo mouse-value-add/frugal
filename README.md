@@ -67,7 +67,8 @@ One MCP server, three tools, seven providers:
 
 - **`frugal__search`** — routed across **SearXNG** (free, self-hosted),
   **Marginalia** (free, public), **Serper** (`$0.001/call`), and
-  **You.com** (`$0.005/call`).
+  **You.com** (`$0.005/call`). Supports optional `cache_ttl_seconds`
+  for lightweight in-process response caching.
 - **`frugal__extract`** — routed across **go-readability** (free, pure-Go
   local Readability) and **Firecrawl** (`~$0.001/page`, JS-rendered).
 - **`frugal__browse`** — **Browserless** (`~$0.002/render`, headless

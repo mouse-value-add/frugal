@@ -35,12 +35,14 @@ type fakeSearcher struct {
 	results   []search.Item
 	err       error
 	lastQuery search.Query
+	calls     int
 }
 
 func (f *fakeSearcher) Name() string         { return f.name }
 func (f *fakeSearcher) CostPerCall() float64 { return f.cost }
 func (f *fakeSearcher) Search(_ context.Context, q search.Query) (search.Results, error) {
 	f.lastQuery = q
+	f.calls++
 	if f.err != nil {
 		return search.Results{}, f.err
 	}
@@ -189,6 +191,40 @@ func TestCallTool_ExplicitProviderOverridesAuto(t *testing.T) {
 	}
 	if out.ProviderUsed != "expensive" {
 		t.Errorf("explicit provider override failed: got %q want expensive", out.ProviderUsed)
+	}
+}
+
+func TestCallTool_CacheTTLReturnsCachedResult(t *testing.T) {
+	cheap := &fakeSearcher{name: "cheap", cost: 0.001, results: []search.Item{{Title: "CHEAP"}}}
+	srv := newServer()
+	RegisterSearch(srv, []search.Searcher{cheap}, nil)
+
+	client, cleanup := dialClient(t, srv)
+	defer cleanup()
+
+	_, err := client.CallTool(context.Background(), &sdkmcp.CallToolParams{
+		Name:      "frugal__search",
+		Arguments: map[string]any{"query": "anything", "cache_ttl_seconds": 60},
+	})
+	if err != nil {
+		t.Fatalf("CallTool first: %v", err)
+	}
+	res2, err := client.CallTool(context.Background(), &sdkmcp.CallToolParams{
+		Name:      "frugal__search",
+		Arguments: map[string]any{"query": "anything", "cache_ttl_seconds": 60},
+	})
+	if err != nil {
+		t.Fatalf("CallTool second: %v", err)
+	}
+	out2, err := decodeSearchOutput(res2.StructuredContent)
+	if err != nil {
+		t.Fatalf("decode structured content: %v", err)
+	}
+	if !out2.CacheHit {
+		t.Fatalf("expected cache_hit=true on second call")
+	}
+	if cheap.calls != 1 {
+		t.Fatalf("expected upstream calls=1 with cache, got %d", cheap.calls)
 	}
 }
 

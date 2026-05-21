@@ -13,6 +13,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"sync"
 	"time"
 
 	sdkmcp "github.com/modelcontextprotocol/go-sdk/mcp"
@@ -28,6 +29,7 @@ type SearchInput struct {
 	Query      string `json:"query" jsonschema:"the search query"`
 	MaxResults int    `json:"max_results,omitempty" jsonschema:"max results to return (default 5, clamped to 20)"`
 	Freshness  string `json:"freshness,omitempty" jsonschema:"optional time window: day | week | month"`
+	CacheTTLSeconds int `json:"cache_ttl_seconds,omitempty" jsonschema:"optional in-process cache TTL in seconds (0 disables cache, max 86400)"`
 	// Provider pins the search provider for this call ("searxng", "serper",
 	// "youcom", …). When empty or "auto", Frugal picks the cheapest
 	// configured provider. Recipe authors use this to override the default
@@ -45,6 +47,7 @@ type SearchOutput struct {
 	CostUSD      float64       `json:"cost_usd"`
 	ProviderUsed string        `json:"provider_used"`
 	LatencyMS    int64         `json:"latency_ms"`
+	CacheHit     bool          `json:"cache_hit,omitempty"`
 }
 
 // RegisterSearch wires frugal__search onto the given MCP server. searchers
@@ -86,6 +89,14 @@ func RegisterSearch(server *sdkmcp.Server, searchers []search.Searcher, metrics 
 }
 
 func makeSearchHandler(searchers []search.Searcher, metrics *obs.Metrics) func(context.Context, *sdkmcp.CallToolRequest, SearchInput) (*sdkmcp.CallToolResult, SearchOutput, error) {
+	type cacheEntry struct {
+		out       SearchOutput
+		expiresAt time.Time
+	}
+	var (
+		mu    sync.Mutex
+		cache = map[string]cacheEntry{}
+	)
 	// Hook closes over metrics so every fallback attempt is recorded —
 	// not just the winner. Nil metrics skips recording, costing a comparison
 	// per call.
@@ -104,6 +115,24 @@ func makeSearchHandler(searchers []search.Searcher, metrics *obs.Metrics) func(c
 			Text:       in.Query,
 			MaxResults: in.MaxResults,
 			Freshness:  in.Freshness,
+		}
+		ttl := in.CacheTTLSeconds
+		if ttl < 0 {
+			ttl = 0
+		}
+		if ttl > 86400 {
+			ttl = 86400
+		}
+		if ttl > 0 {
+			key := fmt.Sprintf("%s|%d|%s|%s", in.Query, in.MaxResults, in.Freshness, in.Provider)
+			mu.Lock()
+			if ce, ok := cache[key]; ok && time.Now().Before(ce.expiresAt) {
+				out := ce.out
+				out.CacheHit = true
+				mu.Unlock()
+				return nil, out, nil
+			}
+			mu.Unlock()
 		}
 		logger := slog.Default()
 
@@ -128,6 +157,12 @@ func makeSearchHandler(searchers []search.Searcher, metrics *obs.Metrics) func(c
 			CostUSD:      res.CostUSD,
 			ProviderUsed: used.Name(),
 			LatencyMS:    latency,
+		}
+		if ttl > 0 {
+			key := fmt.Sprintf("%s|%d|%s|%s", in.Query, in.MaxResults, in.Freshness, in.Provider)
+			mu.Lock()
+			cache[key] = cacheEntry{out: out, expiresAt: time.Now().Add(time.Duration(ttl) * time.Second)}
+			mu.Unlock()
 		}
 		return nil, out, nil
 	}
