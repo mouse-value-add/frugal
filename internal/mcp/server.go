@@ -22,6 +22,7 @@ import (
 	"net/http"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -248,10 +249,17 @@ func withRateLimit(next http.Handler, rpm int) http.Handler {
 	return &rateLimited{next: next, rpm: rpm, buckets: sync.Map{}}
 }
 
+const (
+	maxRateLimitBuckets = 10000
+	bucketTTL           = 10 * time.Minute
+)
+
 type rateLimited struct {
-	next    http.Handler
-	rpm     int
-	buckets sync.Map // key=ip, value=*rlBucket
+	next             http.Handler
+	rpm              int
+	buckets          sync.Map // key=ip, value=*rlBucket
+	bucketCount      int64
+	lastCleanupNanos int64
 }
 
 type rlBucket struct {
@@ -261,9 +269,19 @@ type rlBucket struct {
 }
 
 func (r *rateLimited) ServeHTTP(w http.ResponseWriter, req *http.Request) {
-	ip := clientIP(req)
 	now := time.Now()
-	bAny, _ := r.buckets.LoadOrStore(ip, &rlBucket{remaining: r.rpm, resetAt: now.Add(time.Minute)})
+	r.maybeCleanup(now)
+	ip := clientIP(req)
+
+	bAny, loaded := r.buckets.LoadOrStore(ip, &rlBucket{remaining: r.rpm, resetAt: now.Add(time.Minute)})
+	if !loaded {
+		if atomic.AddInt64(&r.bucketCount, 1) > maxRateLimitBuckets {
+			r.buckets.Delete(ip)
+			atomic.AddInt64(&r.bucketCount, -1)
+			http.Error(w, "rate limiter capacity reached", http.StatusServiceUnavailable)
+			return
+		}
+	}
 	b := bAny.(*rlBucket)
 	b.mu.Lock()
 	if now.After(b.resetAt) {
@@ -280,6 +298,31 @@ func (r *rateLimited) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	b.remaining--
 	b.mu.Unlock()
 	r.next.ServeHTTP(w, req)
+}
+
+func (r *rateLimited) maybeCleanup(now time.Time) {
+	last := time.Unix(0, atomic.LoadInt64(&r.lastCleanupNanos))
+	if now.Sub(last) < time.Minute {
+		return
+	}
+	if !atomic.CompareAndSwapInt64(&r.lastCleanupNanos, last.UnixNano(), now.UnixNano()) {
+		return
+	}
+	staleBefore := now.Add(-bucketTTL)
+	r.buckets.Range(func(key, value any) bool {
+		b, ok := value.(*rlBucket)
+		if !ok {
+			return true
+		}
+		b.mu.Lock()
+		resetAt := b.resetAt
+		b.mu.Unlock()
+		if resetAt.Before(staleBefore) {
+			r.buckets.Delete(key)
+			atomic.AddInt64(&r.bucketCount, -1)
+		}
+		return true
+	})
 }
 
 // clientIP best-effort extracts the client's IP. Strips port from
