@@ -6,7 +6,9 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -107,6 +109,47 @@ func TestServeHTTP_RefusesAnonymousWithoutFlag(t *testing.T) {
 	err := srv.ServeHTTP(context.Background(), ":0", HTTPOptions{}) // no token, no allow-anon
 	if err == nil || !strings.Contains(err.Error(), "FRUGAL_AUTH_TOKEN") {
 		t.Errorf("expected refusal mentioning FRUGAL_AUTH_TOKEN; got %v", err)
+	}
+}
+
+func TestWithRateLimit_CapsBucketCardinality(t *testing.T) {
+	r := &rateLimited{next: echoHandler(), rpm: 1}
+	for i := 0; i < maxRateLimitBuckets; i++ {
+		a := (i / (255 * 255)) % 255
+		b := (i / 255) % 255
+		c := i % 255
+		ip := "10." + strconv.Itoa(a) + "." + strconv.Itoa(b) + "." + strconv.Itoa(c) + ":1234"
+		rec := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodGet, "/", nil)
+		req.RemoteAddr = ip
+		r.ServeHTTP(rec, req)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("pre-cap request %d failed with status %d", i, rec.Code)
+		}
+	}
+
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.RemoteAddr = "198.51.100.200:9999"
+	r.ServeHTTP(rec, req)
+	if rec.Code != http.StatusServiceUnavailable {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusServiceUnavailable)
+	}
+}
+
+func TestRateLimiterCleanup_RemovesStaleBuckets(t *testing.T) {
+	r := &rateLimited{next: echoHandler(), rpm: 1}
+	old := &rlBucket{remaining: 1, resetAt: time.Now().Add(-bucketTTL - time.Minute)}
+	r.buckets.Store("192.0.2.1", old)
+	atomic.StoreInt64(&r.bucketCount, 1)
+	atomic.StoreInt64(&r.lastCleanupNanos, time.Now().Add(-2*time.Minute).UnixNano())
+
+	r.maybeCleanup(time.Now())
+	if _, ok := r.buckets.Load("192.0.2.1"); ok {
+		t.Fatal("expected stale bucket to be removed")
+	}
+	if got := atomic.LoadInt64(&r.bucketCount); got != 0 {
+		t.Fatalf("bucketCount = %d, want 0", got)
 	}
 }
 
