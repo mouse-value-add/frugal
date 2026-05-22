@@ -9,6 +9,10 @@
   Permissions-Policy: accelerometer=(), camera=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), payment=(), usb=()
   Strict-Transport-Security: max-age=63072000; includeSubDomains; preload
   Content-Security-Policy: default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self' 'unsafe-inline'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; object-src 'none'
+  Link: </.well-known/mcp/server-card.json>; rel="describedby"; type="application/json"
+  Link: </.well-known/agent-skills/index.json>; rel="service-meta"; type="application/json"
+  Link: <https://github.com/brainsparker/frugal#readme>; rel="service-doc"
+  Link: <https://github.com/brainsparker/frugal>; rel="related"
 
 # The install script itself should never be cached stale — people expect a
 # fresh version on curl-pipe-sh.
@@ -27,3 +31,18 @@
 
 /favicon.svg
   Cache-Control: public, max-age=604800
+
+# Agent-discovery surfaces. Cloudflare Pages serves dotfile directories
+# under /.well-known/ — explicit Content-Type so the well-known files
+# render correctly when an agent or human curls them.
+/.well-known/mcp/server-card.json
+  Content-Type: application/json; charset=utf-8
+  Cache-Control: public, max-age=3600
+
+/.well-known/agent-skills/index.json
+  Content-Type: application/json; charset=utf-8
+  Cache-Control: public, max-age=3600
+
+/.well-known/agent-skills/frugal/SKILL.md
+  Content-Type: text/markdown; charset=utf-8
+  Cache-Control: public, max-age=3600

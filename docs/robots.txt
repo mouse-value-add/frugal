@@ -2,3 +2,10 @@ User-agent: *
 Allow: /
 
 Sitemap: https://frugal.sh/sitemap.xml
+
+# AI content usage preferences — https://contentsignals.org/ (draft).
+# Frugal is source-available and explicitly designed for agent discovery:
+# we want crawlers to index us, agents to read us at inference time, and
+# model trainers to know the project exists. Public content is meant to
+# teach agents how to use the tool, so ai-train is permitted too.
+Content-Signal: ai-train=yes, search=yes, ai-input=yes

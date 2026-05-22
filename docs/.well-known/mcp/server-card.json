@@ -1,0 +1,50 @@
+{
+  "$schema": "https://modelcontextprotocol.io/schemas/server-card/v0.json",
+  "serverInfo": {
+    "name": "frugal",
+    "title": "Frugal",
+    "description": "Cost-arbitrage MCP server. Routes every agent tool call to the cheapest provider that returns a result. Free / local first, paid as fallback. BYOK, no SaaS, no account.",
+    "homepage": "https://frugal.sh",
+    "repository": "https://github.com/brainsparker/frugal",
+    "license": "BUSL-1.1"
+  },
+  "transport": {
+    "stdio": {
+      "command": "frugal",
+      "args": ["mcp", "serve"]
+    },
+    "streamable_http": {
+      "note": "Operators self-host: `frugal mcp serve --http :8765`. Bearer auth via FRUGAL_AUTH_TOKEN; rate limit + per-request timeout configurable."
+    }
+  },
+  "install": {
+    "shell": "curl -fsSL https://frugal.sh/install | bash",
+    "wire": "frugal mcp install",
+    "notes": "Single Go binary (~10 MB). Auto-detects Claude Desktop, Cursor, Claude Code and merges the MCP config in. No SaaS or account."
+  },
+  "capabilities": {
+    "tools": true
+  },
+  "tools": [
+    {
+      "name": "frugal__search",
+      "description": "Routed web search. Cheapest configured provider wins; falls through on transient error.",
+      "providers": ["searxng", "marginalia", "serper", "youcom"]
+    },
+    {
+      "name": "frugal__extract",
+      "description": "Page → clean markdown/text/HTML. Local go-readability first, Firecrawl as paid fallback for JS-rendered pages.",
+      "providers": ["goreadability", "firecrawl"]
+    },
+    {
+      "name": "frugal__browse",
+      "description": "Headless JS rendering. Use when frugal__extract returns 'page likely requires JS'.",
+      "providers": ["browserless"]
+    }
+  ],
+  "metrics": {
+    "endpoint": "/metrics (only when --http is set)",
+    "format": "Prometheus text",
+    "schema": "frugal_calls_total{tool=,provider=} · frugal_errors_total · frugal_cost_usd_total · frugal_latency_ms_avg"
+  }
+}
