@@ -141,6 +141,17 @@ func TestExtract_EmptyURLIsPermanent(t *testing.T) {
 	}
 }
 
+func TestExtract_UnsupportedSchemeIsPermanent(t *testing.T) {
+	c := New()
+	_, err := c.Extract(context.Background(), extract.Query{URL: "file:///etc/passwd"})
+	if err == nil {
+		t.Fatalf("expected error for unsupported URL scheme")
+	}
+	if !routing.IsPermanent(err) {
+		t.Errorf("unsupported URL scheme should be permanent; got %v", err)
+	}
+}
+
 func TestNameAndCost(t *testing.T) {
 	c := New()
 	if c.Name() != "goreadability" {

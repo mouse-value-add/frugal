@@ -63,6 +63,9 @@ func (c *Client) Extract(ctx context.Context, q extract.Query) (extract.Result, 
 	if err != nil {
 		return extract.Result{}, routing.Permanent(c.Name(), 0, fmt.Errorf("parse url: %w", err))
 	}
+	if parsed.Scheme != "http" && parsed.Scheme != "https" {
+		return extract.Result{}, routing.Permanent(c.Name(), 0, fmt.Errorf("unsupported url scheme: %s", parsed.Scheme))
+	}
 
 	var out extract.Result
 	err = routing.DoWithRetry(ctx, 1+len(routing.DefaultBackoff), routing.DefaultBackoff, func() error {
