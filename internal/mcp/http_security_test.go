@@ -151,6 +151,33 @@ func TestServeHTTP_RefusesAnonymousWithoutFlag(t *testing.T) {
 	}
 }
 
+func TestServeHTTP_RefusesAnonymousNonLocalBind(t *testing.T) {
+	srv := New("frugal", "v", slog.New(slog.NewTextHandler(io.Discard, nil)))
+	err := srv.ServeHTTP(context.Background(), "0.0.0.0:0", HTTPOptions{AllowAnon: true})
+	if err == nil || !strings.Contains(err.Error(), "localhost bind address") {
+		t.Errorf("expected localhost-bind refusal; got %v", err)
+	}
+}
+
+func TestIsLocalhostBind(t *testing.T) {
+	tests := []struct {
+		addr string
+		want bool
+	}{
+		{addr: ":8080", want: true},
+		{addr: "localhost:8080", want: true},
+		{addr: "127.0.0.1:8080", want: true},
+		{addr: "[::1]:8080", want: true},
+		{addr: "0.0.0.0:8080", want: false},
+		{addr: "192.168.1.10:8080", want: false},
+	}
+	for _, tc := range tests {
+		if got := isLocalhostBind(tc.addr); got != tc.want {
+			t.Errorf("isLocalhostBind(%q)=%v, want %v", tc.addr, got, tc.want)
+		}
+	}
+}
+
 func TestWithRateLimit_CapsBucketCardinality(t *testing.T) {
 	r := &rateLimited{next: echoHandler(), rpm: 1}
 	for i := 0; i < maxRateLimitBuckets; i++ {

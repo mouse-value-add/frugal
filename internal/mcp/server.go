@@ -130,6 +130,9 @@ func (s *Server) ServeHTTP(ctx context.Context, addr string, opts HTTPOptions) e
 	if opts.AuthToken == "" && !opts.AllowAnon {
 		return errors.New("mcp serve: --http requires FRUGAL_AUTH_TOKEN or --allow-anon (refusing to expose an unauthenticated MCP server)")
 	}
+	if opts.AuthToken == "" && opts.AllowAnon && !isLocalhostBind(addr) {
+		return errors.New("mcp serve: --allow-anon requires a localhost bind address (use 127.0.0.1, ::1, or localhost)")
+	}
 
 	mcpHandler := mcp.NewStreamableHTTPHandler(func(*http.Request) *mcp.Server {
 		return s.Inner
@@ -194,6 +197,21 @@ func (s *Server) ServeHTTP(ctx context.Context, addr string, opts HTTPOptions) e
 		}
 		return nil
 	}
+}
+
+// isLocalhostBind reports whether addr resolves to a loopback bind. Used
+// by ServeHTTP to refuse --allow-anon on non-local interfaces.
+func isLocalhostBind(addr string) bool {
+	host := addr
+	if h, _, err := net.SplitHostPort(addr); err == nil {
+		host = h
+	}
+	host = strings.TrimSpace(host)
+	if host == "" || host == "localhost" {
+		return true
+	}
+	ip := net.ParseIP(host)
+	return ip != nil && ip.IsLoopback()
 }
 
 // withMaxContentLength rejects requests whose declared Content-Length
