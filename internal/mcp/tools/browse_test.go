@@ -188,3 +188,29 @@ func TestCallTool_BrowseUnknownProviderErrors(t *testing.T) {
 		t.Errorf("expected isError=true for unknown provider; got %+v", res)
 	}
 }
+
+func TestCallTool_BrowseProviderNormalization_TrimAndCaseInsensitive(t *testing.T) {
+	only := &fakeBrowser{name: "browserless", cost: 0.002, res: browse.Result{HTML: "ok", CostUSD: 0.002}}
+	srv := newBrowseServer()
+	RegisterBrowse(srv, []browse.Browser{only}, nil)
+	client, cleanup := dialBrowseClient(t, srv)
+	defer cleanup()
+
+	res, err := client.CallTool(context.Background(), &sdkmcp.CallToolParams{
+		Name: "frugal__browse",
+		Arguments: map[string]any{
+			"url":      "https://example.com",
+			"provider": "  BrOwSeRlEsS  ",
+		},
+	})
+	if err != nil {
+		t.Fatalf("CallTool transport: %v", err)
+	}
+	out, err := decodeBrowseOutput(res.StructuredContent)
+	if err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if out.ProviderUsed != "browserless" {
+		t.Errorf("normalized provider override failed: got %q want browserless", out.ProviderUsed)
+	}
+}

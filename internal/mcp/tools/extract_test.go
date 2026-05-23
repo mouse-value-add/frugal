@@ -190,3 +190,30 @@ func TestCallTool_ExtractUnknownProviderErrors(t *testing.T) {
 		t.Errorf("expected isError=true for unknown provider, got %+v", res)
 	}
 }
+
+func TestCallTool_ExtractProviderNormalization_TrimAndCaseInsensitive(t *testing.T) {
+	free := &fakeExtractor{name: "free", cost: 0, res: extract.Result{Markdown: "FREE"}}
+	paid := &fakeExtractor{name: "paid", cost: 0.001, res: extract.Result{Markdown: "PAID"}}
+	srv := newExtractServer()
+	RegisterExtract(srv, []extract.Extractor{free, paid}, nil)
+	client, cleanup := dialExtractClient(t, srv)
+	defer cleanup()
+
+	res, err := client.CallTool(context.Background(), &sdkmcp.CallToolParams{
+		Name: "frugal__extract",
+		Arguments: map[string]any{
+			"url":      "https://example.com",
+			"provider": "  PaId  ",
+		},
+	})
+	if err != nil {
+		t.Fatalf("CallTool transport: %v", err)
+	}
+	out, err := decodeExtractOutput(res.StructuredContent)
+	if err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if out.ProviderUsed != "paid" {
+		t.Errorf("normalized provider override failed: got %q want paid", out.ProviderUsed)
+	}
+}

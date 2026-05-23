@@ -96,10 +96,11 @@ func makeExtractHandler(extractors []extract.Extractor, metrics *obs.Metrics) fu
 			res  extract.Result
 			err  error
 		)
-		if isAuto(in.Provider) {
+		provider := normalizeProvider(in.Provider)
+		if isAuto(provider) {
 			used, res, err = extract.CallWithFallback(ctx, extractors, q, logger, hook)
 		} else {
-			used, res, err = extract.CallPinned(ctx, extractors, in.Provider, q, logger, hook)
+			used, res, err = extract.CallPinned(ctx, extractors, provider, q, logger, hook)
 		}
 		latency := time.Since(start).Milliseconds()
 		if err != nil {

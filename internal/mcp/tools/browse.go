@@ -90,10 +90,11 @@ func makeBrowseHandler(browsers []browse.Browser, metrics *obs.Metrics) func(con
 			res  browse.Result
 			err  error
 		)
-		if isAuto(in.Provider) {
+		provider := normalizeProvider(in.Provider)
+		if isAuto(provider) {
 			used, res, err = browse.CallWithFallback(ctx, browsers, q, logger, hook)
 		} else {
-			used, res, err = browse.CallPinned(ctx, browsers, in.Provider, q, logger, hook)
+			used, res, err = browse.CallPinned(ctx, browsers, provider, q, logger, hook)
 		}
 		latency := time.Since(start).Milliseconds()
 		if err != nil {
