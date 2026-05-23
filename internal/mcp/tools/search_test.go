@@ -192,6 +192,34 @@ func TestCallTool_ExplicitProviderOverridesAuto(t *testing.T) {
 	}
 }
 
+func TestCallTool_ProviderNormalization_TrimAndCaseInsensitive(t *testing.T) {
+	expensive := &fakeSearcher{name: "expensive", cost: 0.01, results: []search.Item{{Title: "EXPENSIVE"}}}
+	cheap := &fakeSearcher{name: "cheap", cost: 0.001, results: []search.Item{{Title: "CHEAP"}}}
+	srv := newServer()
+	RegisterSearch(srv, []search.Searcher{expensive, cheap}, nil)
+
+	client, cleanup := dialClient(t, srv)
+	defer cleanup()
+
+	res, err := client.CallTool(context.Background(), &sdkmcp.CallToolParams{
+		Name: "frugal__search",
+		Arguments: map[string]any{
+			"query":    "anything",
+			"provider": "  ExPeNsIvE  ",
+		},
+	})
+	if err != nil {
+		t.Fatalf("CallTool: %v", err)
+	}
+	out, err := decodeSearchOutput(res.StructuredContent)
+	if err != nil {
+		t.Fatalf("decode structured content: %v", err)
+	}
+	if out.ProviderUsed != "expensive" {
+		t.Errorf("normalized provider override failed: got %q want expensive", out.ProviderUsed)
+	}
+}
+
 func TestCallTool_UnknownProviderErrors(t *testing.T) {
 	srv := newServer()
 	RegisterSearch(srv, []search.Searcher{&fakeSearcher{name: "only", cost: 0.001}}, nil)
