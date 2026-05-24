@@ -66,6 +66,8 @@ func runMCPServe(args []string) int {
 	allowAnon := fs.Bool("allow-anon", false, "permit --http to run without FRUGAL_AUTH_TOKEN (foot-gun: only for localhost or behind a trusted proxy)")
 	rateLimit := fs.Int("rate-limit-rpm", 600, "per-IP request budget per minute when serving --http (0 disables)")
 	reqTimeout := fs.Duration("request-timeout", 30*time.Second, "per-request timeout when serving --http (0 disables)")
+	readTimeout := fs.Duration("read-timeout", 30*time.Second, "max duration to read each HTTP request when serving --http")
+	writeTimeout := fs.Duration("write-timeout", 30*time.Second, "max duration to write each HTTP response when serving --http")
 	fs.Usage = func() {
 		fmt.Fprintln(os.Stderr, "Usage: frugal mcp serve [--http ADDR]")
 		fmt.Fprintln(os.Stderr, "Run Frugal as an MCP server. Default transport is stdio")
@@ -144,6 +146,8 @@ func runMCPServe(args []string) int {
 			RateLimitPerMinute: *rateLimit,
 			Metrics:            metrics,
 			RequestTimeout:     *reqTimeout,
+			ReadTimeout:        *readTimeout,
+			WriteTimeout:       *writeTimeout,
 		}
 		if err := srv.ServeHTTP(ctx, *httpAddr, opts); err != nil {
 			fmt.Fprintf(os.Stderr, "frugal mcp serve: %v\n", err)

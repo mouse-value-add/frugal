@@ -108,6 +108,11 @@ type HTTPOptions struct {
 	// already handles long-poll'ish streaming; cap at the proxy layer for
 	// remote deployments).
 	RequestTimeout time.Duration
+	// ReadTimeout caps the full request-read duration (headers + body).
+	// Zero defaults to 30s.
+	ReadTimeout time.Duration
+	// WriteTimeout caps the response write duration. Zero defaults to 30s.
+	WriteTimeout time.Duration
 }
 
 // ServeHTTP runs the MCP server over Streamable HTTP on addr. Returns when
@@ -159,6 +164,8 @@ func (s *Server) ServeHTTP(ctx context.Context, addr string, opts HTTPOptions) e
 		Addr:              addr,
 		Handler:           handler,
 		ReadHeaderTimeout: 5 * time.Second,
+		ReadTimeout:       defaultDuration(opts.ReadTimeout, 30*time.Second),
+		WriteTimeout:      defaultDuration(opts.WriteTimeout, 30*time.Second),
 		IdleTimeout:       60 * time.Second,
 	}
 
@@ -189,6 +196,13 @@ func (s *Server) ServeHTTP(ctx context.Context, addr string, opts HTTPOptions) e
 		}
 		return nil
 	}
+}
+
+func defaultDuration(d, fallback time.Duration) time.Duration {
+	if d > 0 {
+		return d
+	}
+	return fallback
 }
 
 // withBearerAuth rejects requests whose Authorization header doesn't carry
