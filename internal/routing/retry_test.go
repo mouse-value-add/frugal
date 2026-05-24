@@ -65,10 +65,24 @@ func TestDoWithRetry_ContextCancelStops(t *testing.T) {
 	if err == nil {
 		t.Fatalf("expected error when context already canceled")
 	}
-	// First call always runs; the context check happens in the backoff
-	// sleep before the second call.
+	if calls != 0 {
+		t.Errorf("calls = %d, want 0 (pre-canceled ctx should skip attempts)", calls)
+	}
+}
+
+func TestDoWithRetry_ContextCanceledAfterFirstAttemptStopsRetries(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	calls := 0
+	err := DoWithRetry(ctx, 5, []time.Duration{10 * time.Millisecond, 10 * time.Millisecond}, func() error {
+		calls++
+		cancel()
+		return Transient("x", 503, errors.New("blip"))
+	})
+	if err == nil {
+		t.Fatalf("expected error when context canceled during retry loop")
+	}
 	if calls != 1 {
-		t.Errorf("calls = %d, want 1 (ctx cancel cut retries short)", calls)
+		t.Errorf("calls = %d, want 1 (ctx cancel after first attempt should stop retries)", calls)
 	}
 }
 

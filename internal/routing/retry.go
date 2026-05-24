@@ -21,6 +21,9 @@ func DoWithRetry(ctx context.Context, attempts int, backoff []time.Duration, fn 
 	}
 	var err error
 	for i := 0; i < attempts; i++ {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
 		err = fn()
 		if err == nil {
 			return nil
