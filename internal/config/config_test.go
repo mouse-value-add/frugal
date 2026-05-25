@@ -83,3 +83,33 @@ mystery_field: oops
 		t.Fatalf("expected error for unknown top-level field")
 	}
 }
+
+func TestLoad_UsesTrimmedFrugalConfigEnv(t *testing.T) {
+	content := `
+providers:
+  openai:
+    api_key_env: OPENAI_API_KEY
+    models:
+      gpt-4o:
+        cost_per_1k_input: 0.0025
+        cost_per_1k_output: 0.01
+        capabilities:
+          reasoning: 0.95
+          coding: 0.92
+          creative: 0.90
+          instruction_following: 0.95
+          max_context: 128000
+`
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.yaml")
+	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	t.Setenv("FRUGAL_CONFIG", "  "+path+"  ")
+
+	_, err := Load("/definitely/not/used.yaml")
+	if err != nil {
+		t.Fatalf("expected trimmed FRUGAL_CONFIG to load, got error: %v", err)
+	}
+}
