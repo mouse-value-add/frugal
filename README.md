@@ -23,9 +23,25 @@ The first command drops the binary in your `$PATH`. The second auto-detects
 Claude Desktop, Cursor, and Claude Code and merges `frugal` into each
 configured MCP server list.
 
-## Set your keys
+## Try it now (no keys)
 
-BYOK. Frugal reads provider credentials from your environment:
+Search and extract work out of the box — **Marginalia** (free, public web
+index) and **go-readability** (free, pure-Go local extractor) ship enabled
+with zero configuration. Restart your agent and ask it something:
+
+```
+> recent AI news?
+  frugal__search → marginalia (free, no key)
+  gpt-4.1-nano synthesizes · $0.0006
+done. total: $0.0006 — zero search cost.
+```
+
+Tool call: free. The rack-rate gap is the gap you keep.
+
+## Set your keys (optional)
+
+Add keys to unlock cheaper paid providers. Frugal reads them from your
+environment and only registers tools whose providers are configured:
 
 ```bash
 # Search — frugal__search
@@ -51,9 +67,9 @@ is 5× Serper at $0.001/call. SearXNG, running on your own machine, is free.
 
 | Capability | Free / local | Cheap paid | Premium paid | Status |
 |---|---|---|---|---|
-| Search | **SearXNG** · **Marginalia** | **Serper** $0.001/call | **You.com** $0.005/call | shipping |
-| Extract | **go-readability** (local) | — | **Firecrawl** $0.001/page | shipping |
-| Browse | local Playwright *(deferred)* | **Browserless** $0.002/render | Browserbase | partial |
+| Search | **SearXNG** · **Marginalia** | **Serper** $0.001/call | **You.com** $0.005/call | **shipping** |
+| Extract | **go-readability** (local) | — | **Firecrawl** $0.001/page | **shipping** |
+| Browse | local Playwright *(deferred)* | **Browserless** $0.002/render | Browserbase | *partial* |
 | Code exec | local Docker | E2B ~$0.10/hr (2 vCPU) | Modal | planned |
 | Embeddings | nomic-embed-text, bge-large | text-embedding-3-small $0.02/1M tok | 3-large, Voyage-3, Cohere | planned |
 | Transcription | whisper.cpp | Deepgram Nova $0.0043/min | OpenAI Whisper $0.006/min | planned |
@@ -65,13 +81,14 @@ configured provider that returns a result; you keep the gap.
 
 One MCP server, three tools, seven providers:
 
-- **`frugal__search`** — routed across **SearXNG** (free, self-hosted),
-  **Marginalia** (free, public), **Serper** (`$0.001/call`), and
-  **You.com** (`$0.005/call`).
-- **`frugal__extract`** — routed across **go-readability** (free, pure-Go
-  local Readability) and **Firecrawl** (`~$0.001/page`, JS-rendered).
-- **`frugal__browse`** — **Browserless** (`~$0.002/render`, headless
-  Chrome). Local Playwright deferred.
+- **`frugal__search`** — **shipping**. Routed across **SearXNG** (free,
+  self-hosted), **Marginalia** (free, public), **Serper** (`$0.001/call`),
+  and **You.com** (`$0.005/call`).
+- **`frugal__extract`** — **shipping**. Routed across **go-readability**
+  (free, pure-Go local Readability) and **Firecrawl** (`~$0.001/page`,
+  JS-rendered).
+- **`frugal__browse`** — *partial*. **Browserless** (`~$0.002/render`,
+  headless Chrome) shipping; local Playwright deferred.
 - Stdio + Streamable HTTP transports.
 - HTTP transport supports bearer-token auth (`FRUGAL_AUTH_TOKEN`),
   per-IP rate limiting, and a `/metrics` endpoint (Prometheus text:
