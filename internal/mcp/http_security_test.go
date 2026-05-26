@@ -60,6 +60,17 @@ func TestWithBearerAuth_AcceptsCorrectToken(t *testing.T) {
 	}
 }
 
+func TestWithBearerAuth_TrimmedConfiguredTokenStillAuthenticates(t *testing.T) {
+	h := withBearerAuth(echoHandler(), "  secret  ")
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.Header.Set("Authorization", "Bearer secret")
+	h.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Errorf("status = %d, want 200", rec.Code)
+	}
+}
+
 func TestWithBearerAuth_AcceptsCaseInsensitiveBearerScheme(t *testing.T) {
 	h := withBearerAuth(echoHandler(), "secret")
 	rec := httptest.NewRecorder()

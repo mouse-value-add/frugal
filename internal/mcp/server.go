@@ -247,6 +247,7 @@ func withSecurityHeaders(next http.Handler) http.Handler {
 // `Bearer <token>`. Paths in skipPaths bypass — used for /metrics so
 // Prometheus scrapers don't need the bearer.
 func withBearerAuth(next http.Handler, token string, skipPaths ...string) http.Handler {
+	token = strings.TrimSpace(token)
 	skip := make(map[string]struct{}, len(skipPaths))
 	for _, p := range skipPaths {
 		skip[p] = struct{}{}
