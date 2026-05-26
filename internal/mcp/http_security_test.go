@@ -220,7 +220,7 @@ func TestRateLimiterCleanup_RemovesStaleBuckets(t *testing.T) {
 }
 
 func TestNewHTTPServer_SetsSafeTimeoutDefaults(t *testing.T) {
-	srv := newHTTPServer(":0", echoHandler())
+	srv := newHTTPServer(":0", echoHandler(), 0)
 	if srv.ReadHeaderTimeout != 5*time.Second {
 		t.Fatalf("ReadHeaderTimeout = %s, want %s", srv.ReadHeaderTimeout, 5*time.Second)
 	}
@@ -292,6 +292,18 @@ func TestServeHTTP_MetricsEndpointBypassesAuth(t *testing.T) {
 	}
 	if allow := resp3.Header.Get("Allow"); allow != "GET, HEAD" {
 		t.Errorf("POST /metrics Allow = %q, want %q", allow, "GET, HEAD")
+	}
+}
+
+func TestResolveMaxHeaderBytes_DefaultAndOverride(t *testing.T) {
+	if got := resolveMaxHeaderBytes(0); got != 1<<20 {
+		t.Fatalf("default max header bytes = %d, want %d", got, 1<<20)
+	}
+	if got := resolveMaxHeaderBytes(-5); got != 1<<20 {
+		t.Fatalf("negative max header bytes = %d, want %d", got, 1<<20)
+	}
+	if got := resolveMaxHeaderBytes(8192); got != 8192 {
+		t.Fatalf("override max header bytes = %d, want %d", got, 8192)
 	}
 }
 

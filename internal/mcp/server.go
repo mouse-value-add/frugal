@@ -111,6 +111,10 @@ type HTTPOptions struct {
 	// MaxRequestBytes rejects requests whose declared Content-Length exceeds
 	// this limit. <=0 disables the guard.
 	MaxRequestBytes int64
+	// MaxHeaderBytes caps inbound HTTP header bytes to reduce memory abuse
+	// from oversized-header requests. Zero/negative falls back to a safe
+	// default (1 MiB).
+	MaxHeaderBytes int
 }
 
 // ServeHTTP runs the MCP server over Streamable HTTP on addr. Returns when
@@ -168,7 +172,7 @@ func (s *Server) ServeHTTP(ctx context.Context, addr string, opts HTTPOptions) e
 	}
 	handler = withSecurityHeaders(handler)
 
-	srv := newHTTPServer(addr, handler)
+	srv := newHTTPServer(addr, handler, opts.MaxHeaderBytes)
 
 	errCh := make(chan error, 1)
 	go func() {
@@ -396,7 +400,7 @@ func clientIP(r *http.Request) string {
 	return host
 }
 
-func newHTTPServer(addr string, handler http.Handler) *http.Server {
+func newHTTPServer(addr string, handler http.Handler, maxHeaderBytes int) *http.Server {
 	return &http.Server{
 		Addr:              addr,
 		Handler:           handler,
@@ -404,5 +408,13 @@ func newHTTPServer(addr string, handler http.Handler) *http.Server {
 		ReadTimeout:       30 * time.Second,
 		WriteTimeout:      60 * time.Second,
 		IdleTimeout:       60 * time.Second,
+		MaxHeaderBytes:    resolveMaxHeaderBytes(maxHeaderBytes),
 	}
+}
+
+func resolveMaxHeaderBytes(v int) int {
+	if v <= 0 {
+		return 1 << 20 // 1 MiB
+	}
+	return v
 }
