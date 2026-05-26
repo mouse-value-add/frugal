@@ -221,7 +221,15 @@ func withBearerAuth(next http.Handler, token string, skipPaths ...string) http.H
 			next.ServeHTTP(w, r)
 			return
 		}
-		got := r.Header.Get("Authorization")
+		vals := r.Header.Values("Authorization")
+		// Require exactly one Authorization header value to avoid ambiguous
+		// multi-value parsing across intermediaries.
+		if len(vals) != 1 {
+			w.Header().Set("WWW-Authenticate", `Bearer realm="frugal"`)
+			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			return
+		}
+		got := strings.TrimSpace(vals[0])
 		// Constant-time compare to avoid leaking the token via timing.
 		if !constantTimeStringEqual(got, expected) {
 			w.Header().Set("WWW-Authenticate", `Bearer realm="frugal"`)
