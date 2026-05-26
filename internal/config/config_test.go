@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -109,31 +110,14 @@ search_providers:
 }
 
 func TestLoad_RejectsMultipleYAMLDocuments(t *testing.T) {
+	t.Setenv("FRUGAL_CONFIG", "")
 	content := `
-providers:
-  openai:
-    api_key_env: OPENAI_API_KEY
-    base_url: https://api.openai.com/v1
-    models:
-      gpt-4o:
-        cost_per_1k_input: 0.0025
-        cost_per_1k_output: 0.01
-        capabilities:
-          reasoning: 0.95
-          coding: 0.92
-          creative: 0.90
-          instruction_following: 0.95
-          tool_use: true
-          json_mode: true
-          max_context: 128000
-quality_thresholds:
-  balanced:
-    min_reasoning: 0.70
-    min_coding: 0.68
-    min_creative: 0.65
-    min_instruction_following: 0.72
+search_providers:
+  serper:
+    api_key_env: SERPER_API_KEY
+    cost_per_call: 0.001
 ---
-providers: {}
+search_providers: {}
 `
 	dir := t.TempDir()
 	path := filepath.Join(dir, "config.yaml")
