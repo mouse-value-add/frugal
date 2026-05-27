@@ -8,8 +8,6 @@
 // transports, and a tool registry that's intentionally empty (tools/list
 // returns no entries). PR 4 registers frugal__search. The scaffold is
 // validated against a real client via NewInMemoryTransports in tests.
-//
-// See STRATEGY.md for the product positioning and component-status matrix.
 package mcp
 
 import (

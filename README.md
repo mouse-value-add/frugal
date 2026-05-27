@@ -10,7 +10,7 @@ premium only when you opt in.
 Works with any model. One signed Go binary. Your keys. No account.
 Source-available (BUSL 1.1 → Apache 2.0).
 
-[frugal.sh](https://frugal.sh) · [Strategy](./STRATEGY.md)
+[frugal.sh](https://frugal.sh)
 
 ## Install
 
@@ -102,8 +102,6 @@ One MCP server, three tools, seven providers:
   models, semantic cache.
 - **Phase 4** — Frugal Cloud: hosted MCP endpoint for users who don't want
   to operate the local stack themselves.
-
-Roadmap and rationale in [STRATEGY.md](./STRATEGY.md).
 
 ## From source
 
