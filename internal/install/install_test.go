@@ -2,6 +2,7 @@ package install
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -125,14 +126,33 @@ func TestApply_JSONFile(t *testing.T) {
 	}
 }
 
-func TestApply_CLIClient_ReturnsSuggestion(t *testing.T) {
+func TestApply_CLIClient_ExecSuccess(t *testing.T) {
+	prev := claudeMCPAdder
+	t.Cleanup(func() { claudeMCPAdder = prev })
+	claudeMCPAdder = func(string) error { return nil }
+
+	c := Client{ID: "claude-code", Kind: KindCLI}
+	suggestion, err := Apply(c, "/bin/frugal")
+	if err != nil {
+		t.Fatalf("Apply: %v", err)
+	}
+	if suggestion != "" {
+		t.Errorf("exec succeeded; suggestion should be empty, got %q", suggestion)
+	}
+}
+
+func TestApply_CLIClient_ExecFailureFallsBackToSuggestion(t *testing.T) {
+	prev := claudeMCPAdder
+	t.Cleanup(func() { claudeMCPAdder = prev })
+	claudeMCPAdder = func(string) error { return fmt.Errorf("simulated exec failure") }
+
 	c := Client{ID: "claude-code", Kind: KindCLI}
 	suggestion, err := Apply(c, "/bin/frugal")
 	if err != nil {
 		t.Fatalf("Apply: %v", err)
 	}
 	if !strings.Contains(suggestion, "claude mcp add frugal") {
-		t.Errorf("CLI suggestion missing: %s", suggestion)
+		t.Errorf("exec failed; expected fallback suggestion, got %q", suggestion)
 	}
 }
 

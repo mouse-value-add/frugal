@@ -246,8 +246,12 @@ func runMCPInstall(args []string) int {
 		case install.KindJSONFile:
 			fmt.Fprintf(os.Stderr, "✓ %s: wrote %s\n", c.Title, c.ConfigPath)
 		case install.KindCLI:
-			fmt.Fprintf(os.Stderr, "→ %s: run this command yourself (the `claude` CLI manages its own config)\n", c.Title)
-			fmt.Fprintf(os.Stderr, "    %s\n", suggestion)
+			if suggestion == "" {
+				fmt.Fprintf(os.Stderr, "✓ %s: registered via `claude mcp add`\n", c.Title)
+			} else {
+				fmt.Fprintf(os.Stderr, "→ %s: couldn't invoke the `claude` CLI; run this yourself:\n", c.Title)
+				fmt.Fprintf(os.Stderr, "    %s\n", suggestion)
+			}
 		}
 	}
 	if hadErr {

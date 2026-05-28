@@ -9,10 +9,11 @@
 //     key the user has set.
 //
 //   - CLI-managed clients (Claude Code) own their own config and expect
-//     `claude mcp add` to mutate it. We print the exact command the user
-//     should run rather than attempt to shell out — the `claude` CLI's
-//     flag set varies across versions and we'd rather hand the user a
-//     correct command than guess wrong.
+//     `claude mcp add` to mutate it. We shell out to the claude CLI when
+//     it's available, doing a remove-then-add so the operation is
+//     idempotent. If the exec fails (claude not on PATH at apply time,
+//     incompatible flags, sandboxing), we fall back to printing the
+//     exact command the user can run themselves.
 //
 // `frugal mcp install` consumes this package: it calls DetectClients to
 // see what's present, renders the plan, and (with confirmation) calls
@@ -136,17 +137,40 @@ func PlanFor(c Client, binPath string) string {
 
 // Apply writes (or schedules) the install for one client. For JSON-file
 // clients the config is read, merged, and written atomically. For CLI
-// clients the function returns the suggested command string so the
-// caller can print it (Apply never shells out).
+// clients (Claude Code) Apply shells out to `claude mcp` to register
+// Frugal idempotently; if the exec fails it returns the equivalent
+// command string so the caller can print it as a fallback. A non-empty
+// suggestion always means "exec didn't run — show this to the user."
 func Apply(c Client, binPath string) (suggestion string, err error) {
 	entry := ServerEntry{Command: binPath, Args: []string{"mcp", "serve"}}
 	switch c.Kind {
 	case KindJSONFile:
 		return "", mergeJSONConfig(c.ConfigPath, ServerName, entry)
 	case KindCLI:
-		return claudeCodeAddCommand(binPath), nil
+		if err := claudeMCPAdder(binPath); err != nil {
+			return claudeCodeAddCommand(binPath), nil
+		}
+		return "", nil
 	}
 	return "", fmt.Errorf("unknown client kind: %s", c.Kind)
+}
+
+// claudeMCPAdder is swappable so tests can avoid shelling out. Default
+// implementation invokes the real claude CLI; tests reassign it.
+var claudeMCPAdder = runClaudeMCPAdd
+
+// runClaudeMCPAdd registers Frugal with Claude Code via the claude CLI.
+// Removes any prior `frugal` entry first so re-running install is
+// idempotent (the `add` itself would otherwise error on a duplicate).
+// claude's output is suppressed — the installer prints its own status.
+func runClaudeMCPAdd(binPath string) error {
+	// Best-effort remove; missing-entry is not an error we care about.
+	_ = exec.Command("claude", "mcp", "remove", ServerName).Run()
+	cmd := exec.Command("claude", "mcp", "add", ServerName, "--", binPath, "mcp", "serve")
+	if out, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("claude mcp add: %w (%s)", err, bytes.TrimSpace(out))
+	}
+	return nil
 }
 
 // FrugalBinary resolves the absolute path of the running frugal binary,
