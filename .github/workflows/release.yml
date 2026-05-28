@@ -48,3 +48,43 @@ jobs:
         with:
           files: dist/*
           generate_release_notes: true
+
+      ### Publish the npm wrapper that bootstraps the Go binary on first
+      ### run (`npx frugal-mcp …`). The wrapper downloads from the
+      ### GitHub release we just uploaded, so order matters — keep this
+      ### after the gh-release step.
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "lts/*"
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Stamp version into npm package + server.json
+        run: |
+          set -euo pipefail
+          V="${GITHUB_REF#refs/tags/v}"
+          node -e "const f='npm/package.json';const j=require('./'+f);j.version=process.argv[1];require('fs').writeFileSync(f,JSON.stringify(j,null,2)+'\n');" "$V"
+          jq --arg v "$V" '.version = $v | .packages[0].version = $v' server.json > server.tmp && mv server.tmp server.json
+
+      - name: Publish npm wrapper
+        working-directory: npm
+        run: npm publish --access public --provenance
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      ### Publish server metadata to the official MCP Registry. The
+      ### Registry verifies the npm package's `mcpName` matches the
+      ### server.json `name`, so this only works after the npm publish
+      ### above succeeds.
+
+      - name: Install mcp-publisher
+        run: |
+          set -euo pipefail
+          curl -sSL "https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_$(uname -s | tr '[:upper:]' '[:lower:]')_$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/').tar.gz" | tar xz mcp-publisher
+          chmod +x mcp-publisher
+
+      - name: Authenticate to MCP Registry (GitHub OIDC)
+        run: ./mcp-publisher login github-oidc
+
+      - name: Publish to MCP Registry
+        run: ./mcp-publisher publish

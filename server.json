@@ -1,0 +1,21 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.brainsparker/frugal",
+  "title": "Frugal",
+  "description": "Cost-optimized MCP server. Routes every tool call to the cheapest provider that returns a result — free / local first, paid as fallback. Ships frugal__search, frugal__extract, and frugal__browse.",
+  "repository": {
+    "url": "https://github.com/brainsparker/frugal",
+    "source": "github"
+  },
+  "version": "0.0.0",
+  "packages": [
+    {
+      "registryType": "npm",
+      "identifier": "frugal-mcp",
+      "version": "0.0.0",
+      "transport": {
+        "type": "stdio"
+      }
+    }
+  ]
+}

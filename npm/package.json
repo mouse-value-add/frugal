@@ -1,0 +1,36 @@
+{
+  "name": "frugal-mcp",
+  "version": "0.0.0",
+  "description": "Cost-optimized MCP server and proxy router for Claude, Cursor, and any agent. Picks the cheapest model + toolchain per use case.",
+  "keywords": [
+    "mcp",
+    "mcp-server",
+    "model-context-protocol",
+    "claude",
+    "cursor",
+    "llm",
+    "llm-routing",
+    "cost-optimization",
+    "agent-tools"
+  ],
+  "homepage": "https://frugal.sh",
+  "bugs": "https://github.com/brainsparker/frugal/issues",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/brainsparker/frugal.git"
+  },
+  "license": "BUSL-1.1",
+  "author": "Brian Sparker",
+  "mcpName": "io.github.brainsparker/frugal",
+  "type": "module",
+  "bin": {
+    "frugal-mcp": "bin/frugal-mcp.mjs"
+  },
+  "files": [
+    "bin",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=18"
+  }
+}
