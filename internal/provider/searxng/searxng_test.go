@@ -2,8 +2,10 @@ package searxng
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"sync/atomic"
 	"testing"
 
@@ -102,6 +104,23 @@ func TestSearch_NetworkErrorIsTransient(t *testing.T) {
 	}
 	if !routing.IsTransient(err) {
 		t.Errorf("network failure should classify as transient; got %v", err)
+	}
+}
+
+func TestSearch_OversizedPayloadIsTransient(t *testing.T) {
+	largeContent := strings.Repeat("x", maxResponseBodyBytes)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = fmt.Fprintf(w, `{"results":[{"title":"huge","url":"https://x","content":"%s"}]}`, largeContent)
+	}))
+	defer srv.Close()
+
+	c := New(srv.URL)
+	_, err := c.Search(context.Background(), search.Query{Text: "x"})
+	if err == nil {
+		t.Fatalf("expected decode failure for oversized payload")
+	}
+	if !routing.IsTransient(err) {
+		t.Fatalf("expected transient classification, got %v", err)
 	}
 }
 
