@@ -130,7 +130,7 @@ func PlanFor(c Client, binPath string) string {
 		return fmt.Sprintf("merge `mcpServers.%s = {command: %q, args: [mcp serve]}` into %s",
 			ServerName, binPath, c.ConfigPath)
 	case KindCLI:
-		return "print this command for the user to run:\n  " + claudeCodeAddCommand(binPath)
+		return "register via `" + claudeCodeAddCommand(binPath) + "` (idempotent)"
 	}
 	return ""
 }
