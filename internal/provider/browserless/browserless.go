@@ -24,6 +24,10 @@ import (
 // DefaultBaseURL is the Browserless production endpoint.
 const DefaultBaseURL = "https://chrome.browserless.io"
 
+// maxHTMLBytes caps /content payload size to avoid unbounded memory usage on
+// pathological renders.
+const maxHTMLBytes = 2 << 20 // 2 MiB
+
 // Client implements browse.Browser against Browserless.
 type Client struct {
 	token       string
@@ -104,11 +108,14 @@ func (c *Client) doOnce(ctx context.Context, body []byte, returnFormat string) (
 		}
 	}
 
-	// Browserless /content returns the rendered HTML as the response body,
-	// not JSON. Read everything.
-	html, err := io.ReadAll(resp.Body)
+	// Browserless /content returns rendered HTML. Bound payload size to prevent
+	// unbounded memory growth on unexpectedly huge pages.
+	html, err := io.ReadAll(io.LimitReader(resp.Body, maxHTMLBytes+1))
 	if err != nil {
 		return browse.Result{}, routing.Transient(c.Name(), resp.StatusCode, fmt.Errorf("read body: %w", err))
+	}
+	if len(html) > maxHTMLBytes {
+		return browse.Result{}, routing.Permanent(c.Name(), resp.StatusCode, fmt.Errorf("response body exceeds %d bytes", maxHTMLBytes))
 	}
 	res := browse.Result{HTML: string(html), CostUSD: c.costPerCall}
 	if returnFormat == "text" {

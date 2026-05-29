@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -161,5 +162,27 @@ func TestNew_DefaultsBaseURL(t *testing.T) {
 	c := New("k", "", 0.002)
 	if c.baseURL != DefaultBaseURL {
 		t.Errorf("baseURL default: got %q want %q", c.baseURL, DefaultBaseURL)
+	}
+}
+
+func TestRender_ResponseTooLargeIsPermanent(t *testing.T) {
+	oversized := strings.Repeat("a", maxHTMLBytes+1)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "text/html")
+		w.Header().Set("Content-Length", strconv.Itoa(len(oversized)))
+		_, _ = w.Write([]byte(oversized))
+	}))
+	defer srv.Close()
+
+	c := New("k", srv.URL, 0.002)
+	_, err := c.Render(context.Background(), browse.Query{URL: "https://example.com/huge"})
+	if err == nil {
+		t.Fatalf("expected oversized body error")
+	}
+	if !routing.IsPermanent(err) {
+		t.Fatalf("oversized body must be permanent; got %v", err)
+	}
+	if !strings.Contains(err.Error(), "response body exceeds") {
+		t.Fatalf("expected size cap message; got %v", err)
 	}
 }
