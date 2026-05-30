@@ -149,3 +149,19 @@ func TestNew_TrimsTrailingSlash(t *testing.T) {
 		t.Errorf("baseURL: got %q, want trimmed", c.baseURL)
 	}
 }
+
+func TestSearch_ResponseBodyTooLargeIsTransient(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte(`{"results":[{"title":"` + strings.Repeat("x", maxResponseBodyBytes) + `","url":"https://x","description":"y"}]}`))
+	}))
+	defer srv.Close()
+
+	c := New(srv.URL)
+	_, err := c.Search(context.Background(), search.Query{Text: "x"})
+	if err == nil {
+		t.Fatalf("expected decode error for oversized response")
+	}
+	if !routing.IsTransient(err) {
+		t.Fatalf("expected transient classification, got %v", err)
+	}
+}
